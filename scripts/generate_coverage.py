@@ -108,7 +108,8 @@ def write_navigator_layer(rules: list[dict]) -> None:
         for t in r["techniques"]:
             by_tech[t].append(r)
     techniques = []
-    for tech, hits in by_tech.items():
+    for tech in sorted(by_tech):
+        hits = by_tech[tech]
         comment = "; ".join(f"{r['name']} ({r['kind']})" for r in hits)
         techniques.append({
             "techniqueID": tech,
