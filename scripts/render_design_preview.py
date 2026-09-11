@@ -72,6 +72,32 @@ def shorten(text: str, width: int = 30) -> str:
     return "\n".join(textwrap.wrap(text, width))
 
 
+
+
+def save_without_metadata(fig, path: pathlib.Path, **kwargs) -> None:
+    """Save a figure with no PNG metadata.
+
+    Two reasons this is not optional. A PNG written by matplotlib carries
+    ``Software: Matplotlib version...``, which is one more piece of environment
+    detail in a public repository. More importantly it makes the bytes depend on
+    the installed matplotlib version, so a byte-comparison drift gate would fail on
+    a machine with a different release even though the picture is identical. The
+    figure is written to memory, re-encoded through Pillow with no ``info`` dict,
+    and only then written to disk.
+    """
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png", **kwargs)
+    buffer.seek(0)
+    with Image.open(buffer) as image:
+        clean = Image.new("RGB", image.size, (255, 255, 255))
+        clean.paste(image.convert("RGBA"), mask=image.convert("RGBA").split()[-1])
+        path.parent.mkdir(parents=True, exist_ok=True)
+        clean.save(path, format="PNG", optimize=True)
+
 def draw() -> None:
     panels = load_panels()
     if not panels:
@@ -134,7 +160,7 @@ def draw() -> None:
             color=MUTED, ha="right", **FONT)
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(OUTPUT, dpi=100, facecolor=BG)
+    save_without_metadata(fig, OUTPUT, dpi=100, facecolor=BG)
     plt.close(fig)
 
 

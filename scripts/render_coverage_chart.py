@@ -58,6 +58,32 @@ def load_rule_techniques() -> tuple[dict[str, set[str]], dict[str, set[str]]]:
     return dets, hunts
 
 
+
+
+def save_without_metadata(fig, path: pathlib.Path, **kwargs) -> None:
+    """Save a figure with no PNG metadata.
+
+    Two reasons this is not optional. A PNG written by matplotlib carries
+    ``Software: Matplotlib version...``, which is one more piece of environment
+    detail in a public repository. More importantly it makes the bytes depend on
+    the installed matplotlib version, so a byte-comparison drift gate would fail on
+    a machine with a different release even though the picture is identical. The
+    figure is written to memory, re-encoded through Pillow with no ``info`` dict,
+    and only then written to disk.
+    """
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png", **kwargs)
+    buffer.seek(0)
+    with Image.open(buffer) as image:
+        clean = Image.new("RGB", image.size, (255, 255, 255))
+        clean.paste(image.convert("RGBA"), mask=image.convert("RGBA").split()[-1])
+        path.parent.mkdir(parents=True, exist_ok=True)
+        clean.save(path, format="PNG", optimize=True)
+
 def main() -> int:
     layer = json.loads(LAYER.read_text(encoding="utf-8"))
     attack = json.loads(ATTACK_DB.read_text(encoding="utf-8"))
@@ -103,7 +129,7 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / "01-attack-coverage-by-tactic.png"
     fig.tight_layout()
-    fig.savefig(out, facecolor="white")
+    save_without_metadata(fig, out, facecolor="white")
     plt.close(fig)
     print(f"wrote {out.relative_to(REPO)}")
     return 0

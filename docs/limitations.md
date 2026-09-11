@@ -59,7 +59,7 @@ find. One such defect (a parameter reference with the wrong casing) was found by
 own validator rather than by a reviewer.
 
 **Mitigation in place.** The compensating control is mechanical rather than social: 15 validation
-families, 133 tests including negative tests that prove the validator rejects bad input, five drift
+families, 148 tests including negative tests that prove the validator rejects bad input, five drift
 gates, and documentation numbers that fail the build when they stop matching the repository. A
 validator that fails loudly is a partial substitute for a reviewer, and the repository says which
 it has.

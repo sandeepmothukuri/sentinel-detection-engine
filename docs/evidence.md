@@ -26,6 +26,34 @@ Where the repository does not have evidence, the corresponding documentation say
 `Not yet measured`, `Requires live tenant validation`, or `Awaiting live telemetry` rather than
 supplying a picture that implies otherwise.
 
+## Filing a real capture
+
+When a live tenant exists and you have a screenshot worth committing, it enters through
+[`scripts/register_screenshot.py`](../scripts/register_screenshot.py) rather than by copying a file
+into place:
+
+```bash
+python scripts/register_screenshot.py capture.png \
+    --area sentinel --slug workspace-overview \
+    --purpose "The lab workspace with Sentinel enabled and the connectors connected" \
+    --environment "Single-author lab: Azure free tier, one Log Analytics workspace, E5 dev tenant" \
+    --redactions "Subscription and workspace ids painted over; tenant domain cropped"
+```
+
+The script strips the file's EXIF and PNG text metadata by re-encoding it losslessly, names and
+files it as `NN-lab-<slug>.png` in the right area, records its SHA-256, and writes the register
+entry below with an **empty `Demonstrates` line**. That line is the only part it will not write,
+because only the person who took the screenshot can say what it shows.
+
+`tests/test_evidence.py` enforces the rest: no committed image may carry metadata, every
+`Screenshot` entry must record an environment, a date and a redaction statement, a lab capture must
+follow the naming convention, and **an entry whose `Demonstrates` line is still the intake
+placeholder fails the build.** A screenshot that nobody has described is not evidence.
+
+Redaction is yours to do in the pixels, before filing: subscription and tenant ids, workspace ids,
+user principal names, e-mail addresses, IP addresses, organisation names, hostnames, tokens and
+secrets. The script removes what is attached to the file, not what is on the screen.
+
 ---
 
 ## architecture

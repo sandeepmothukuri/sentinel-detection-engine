@@ -39,10 +39,14 @@ docs/images/
    hand-typed numbers is not acceptable.
 3. A design preview must be **labelled in the image itself** as a design preview that requires
    deployment. The label is part of the drawing, not a caption that can be cropped away.
-4. A screenshot is only added if it was genuinely captured, and it must be recorded in
-   `docs/evidence.md` with its environment and a redaction list. Tenant ids, subscription ids,
-   user principal names, e-mail addresses, IP addresses, organisation names, hostnames, tokens
-   and secrets must be redacted before the file is committed.
+4. A screenshot is only added if it was genuinely captured, and it is filed **through**
+   [`../../scripts/register_screenshot.py`](../../scripts/register_screenshot.py), which re-encodes
+   the file without EXIF/PNG metadata, names it `NN-lab-<slug>.png`, records its checksum and writes
+   the `docs/evidence.md` entry. Tenant ids, subscription ids, user principal names, e-mail
+   addresses, IP addresses, organisation names, hostnames, tokens and secrets must be redacted
+   **in the pixels** before filing — the script removes what is attached to the file, not what is on
+   the screen. `tests/test_evidence.py` fails the build on metadata, on a missing environment or
+   redaction statement, and on an unfilled `Demonstrates` line.
 5. No image may contain fabricated incident numbers, alert counts, metric values, user names or
    hostnames. Where a number would appear in a real deployment, the image shows `—`, a
    placeholder, or simply the panel with no value.
