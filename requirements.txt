@@ -12,7 +12,7 @@
 # and chart gates, and render_project_charts.py --check redraws each figure in memory
 # so it can compare the numbers it would draw against the recorded ones.
 PyYAML>=6.0,<7
-yamllint>=1.35,<2
+yamllint>=1.38.0,<2
 pytest>=8.0,<9
 matplotlib>=3.8,<4
 Pillow>=10.0
