@@ -8,6 +8,12 @@ The full inventory — purpose, provenance, environment, date, what each image d
 what was redacted — lives in [`../evidence.md`](../evidence.md). Read that before reusing or
 replacing an image.
 
+The screenshots this repository still owes, with the portal path, the redaction checklist and the
+one-command intake for each, are in [`capture-guide.md`](capture-guide.md); their status is tracked in
+[`capture-manifest.yaml`](capture-manifest.yaml), which `tests/test_evidence.py` holds to the disk.
+Nine of the ten listed shots are pending — that is the honest state, and it is stated here rather than
+filled with a drawing.
+
 ## Layout
 
 ```
@@ -52,7 +58,11 @@ Navigator export). There is no AI-generated imagery and no mockup of a system th
    **in the pixels** before filing — the script removes what is attached to the file, not what is on
    the screen. `tests/test_evidence.py` fails the build on metadata, on a missing environment or
    redaction statement, and on an unfilled `Demonstrates` line.
-5. No image may present an invented value as a measurement. Where a number would appear in a real
+5. A capture that is worth taking but has not been taken is listed in
+   [`capture-manifest.yaml`](capture-manifest.yaml) with its status, not omitted. Filing it through
+   `scripts/register_screenshot.py --manifest-id <id>` flips the status, and the test fails if the
+   manifest and the disk disagree in either direction.
+6. No image may present an invented value as a measurement. Where a number would appear in a real
    deployment, the image shows `—`, a placeholder, or the panel with no value. **One exception is
    allowed, and it is fenced:** a design preview whose purpose is to show *layout* may carry
    illustrative sample values, provided all four of these hold —
@@ -65,7 +75,7 @@ Navigator export). There is no AI-generated imagery and no mockup of a system th
    Reference: `workbooks/01` (data-free) and `workbooks/02` (illustrative). The rule exists because
    a screenshot-shaped image with plausible numbers is read as production evidence no matter what
    its caption says.
-6. Images whose numbers come from a live tenant are never committed. A screenshot that would
+7. Images whose numbers come from a live tenant are never committed. A screenshot that would
    require real fleet data is replaced by a diagram plus a written note that the evidence is
    tenant-specific.
 

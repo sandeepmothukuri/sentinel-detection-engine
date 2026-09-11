@@ -1,0 +1,92 @@
+# The screenshots worth taking, and whether each one has been taken.
+#
+# This file is a checklist, not a wish list: tests/test_evidence.py fails the build if a shot is
+# marked captured without a committed image and a register entry, if a pending shot already has an
+# image on disk, or if a committed Screenshot in docs/evidence.md is missing from this list.
+#
+# Filing a capture flips its status here:
+#   python scripts/register_screenshot.py capture.png --area <area> --slug <slug> \
+#       --purpose "..." --environment "..." --redactions "..." --manifest-id <id>
+#
+# Instructions, portal paths and redaction checklists for every shot: docs/images/capture-guide.md
+schema_version: 1
+shots:
+  - id: attack-navigator-export
+    area: attack
+    slug: navigator-export
+    priority: 0
+    status: captured
+    file: docs/images/attack/03-attack-navigator-export.png
+    proves: The ATT&CK layer this repository generates is rendered by the official MITRE ATT&CK Navigator, so the coverage claim is reproducible in the tool a defender would actually open.
+
+  - id: sentinel-incident-with-entities
+    area: sentinel
+    slug: incident-with-entities
+    priority: 1
+    status: pending
+    file: null
+    proves: A rule fired on real telemetry, produced the account, host and IP entities the playbooks consume, and rendered the custom alert details declared in its alertDetailsOverride block.
+
+  - id: soar-incident-comment-audit-trail
+    area: soar
+    slug: incident-comment-audit-trail
+    priority: 2
+    status: pending
+    file: null
+    proves: The playbook ran its gates and left the audit trail on the incident — confidence against threshold, the severity floor, the exclusion-list sizes and the rollback instruction.
+
+  - id: workbooks-triage-dashboard-live
+    area: workbooks
+    slug: triage-dashboard-live
+    priority: 3
+    status: pending
+    file: null
+    proves: The triage workbook binds to the declared tables and renders against real incident history, including the panels that are still empty.
+
+  - id: sentinel-analytics-rule-deployed
+    area: sentinel
+    slug: analytics-rule-deployed
+    priority: 4
+    status: pending
+    file: null
+    proves: The generated ARM templates deploy — the rules exist in a workspace, enabled, with the severities and ATT&CK mappings the authoring YAML declares.
+
+  - id: soar-playbook-run-history
+    area: soar
+    slug: playbook-run-history
+    priority: 5
+    status: pending
+    file: null
+    proves: The safety gates are observable per run, including the accounts a gate skipped, which is the behaviour the documentation promises and a diagram cannot demonstrate.
+
+  - id: hunting-query-results
+    area: hunting
+    slug: hunt-results
+    priority: 6
+    status: pending
+    file: null
+    proves: A hunting query executes against its declared telemetry table and returns the columns and row shape its README describes.
+
+  - id: ci-actions-run-green
+    area: ci-cd
+    slug: actions-run-green
+    priority: 7
+    status: pending
+    file: null
+    proves: The validation workflow runs on GitHub itself — the one CI claim a local reproduction cannot make and the reason a failing run must never be reported as green.
+
+  - id: sentinel-repository-connection
+    area: sentinel
+    slug: repository-connection
+    priority: 8
+    status: pending
+    file: null
+    proves: The GitOps deployment path documented in docs/deployment.md is the real one, consuming the generated ARM templates rather than the authoring YAML.
+
+  - id: detections-local-validation-run
+    area: detections
+    slug: local-validation-run
+    priority: 9
+    status: pending
+    file: null
+    proves: The validator and the test suite run end to end on a real machine. Optional, and last on the list, because a green CI run supersedes it and a terminal capture is the easiest screenshot to fake.

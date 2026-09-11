@@ -404,6 +404,10 @@ later starts at `04` for the same reason.*
 
 ## What is deliberately absent from this register
 
+Every missing capture below is on the shot list in
+[`images/capture-guide.md`](images/capture-guide.md) with the portal path and the intake command, and
+tracked as `pending` in [`images/capture-manifest.yaml`](images/capture-manifest.yaml).
+
 | Missing evidence | Why it is missing | Where the gap is recorded |
 |---|---|---|
 | Sentinel analytics-rule deployment screenshots | No live workspace exists; importing the rules is an environment action the reader performs | `docs/production-readiness.md`, `docs/limitations.md` |

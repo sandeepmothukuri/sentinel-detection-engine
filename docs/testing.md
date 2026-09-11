@@ -31,7 +31,7 @@ build if that total and the one quoted in the README stop agreeing.
 | ATT&CK | `scripts/ci_validate.py` + vendored `scripts/attack_data.json` (MITRE CTI, 697 techniques; revoked/deprecated excluded) | Technique ids exist and tactics are consistent |
 | Telemetry | `scripts/ci_validate.py` (`TABLE_CATALOG`) | Every table the query reads is produced by a declared connector/dataType |
 | KQL lint | `scripts/kql_lint.py` | Bracket/quote balance (string-aware), invalid set operators, `matches regex`/`extract()` regex validity, no `now()` in scheduled rules |
-| Python tests | `pytest tests/` (196 tests) | Regressions: parameter parsing patterns, uniqueness, honest validation statuses, JSON artifacts parse, the declared toolchain matches what the gates import |
+| Python tests | `pytest tests/` (201 tests) | Regressions: parameter parsing patterns, uniqueness, honest validation statuses, JSON artifacts parse, the declared toolchain matches what the gates import |
 | Coverage drift | `validate.yml` | `coverage.md` + Navigator layer regenerate byte-identical |
 | ARM drift | `validate.yml` | `deploy/` regenerates byte-identical from the rule files |
 | Preview digest | `scripts/render_design_preview.py --check` | The committed workbook preview matches the digest of the workbook definition it was drawn from |
@@ -48,7 +48,7 @@ build if that total and the one quoted in the README stop agreeing.
 | `tests/test_validator_negative.py` | 33 | The validator itself: a 30-day period, an undeclared connector, a mismatched technique, dropped `TimeGenerated`, invalid KQL, placeholder text and AI-style author attribution must each be rejected, with the right message |
 | `tests/test_validation.py` | 23 | The ledger: schema, status vocabulary, upstream atomic citations, the honesty banner, generator freshness, and the requirement that a manual-only entry explains itself in more than a line |
 | `tests/test_backtest.py` | 9 | The backtesting contract: plan-only runs execute nothing, a run without a workspace refuses instead of inventing a result, and every query rewrite is reported |
-| `tests/test_evidence.py` | 15 | Evidence hygiene for images: no committed image carries EXIF or PNG metadata, every `Screenshot` entry records an environment, date and redaction statement, lab captures follow the naming convention, and an unfilled `Demonstrates` line fails the build |
+| `tests/test_evidence.py` | 20 | Evidence hygiene for images: no committed image carries EXIF or PNG metadata, every `Screenshot` entry records an environment, date and redaction statement, lab captures follow the naming convention, and an unfilled `Demonstrates` line fails the build |
 | `tests/test_sigma_converter.py` | 7 | Sigma translation, including that a prefix match is never silently widened into a substring match |
 | `tests/test_arm_templates.py` | 16 | The deployable artefact: `deploy/` matches the rule files, every emitted property is a real alert-rule property, the resource name uses the committed rule id, and the converter refuses timespans and trigger operators it does not understand |
 | `tests/test_diagrams.py` | 11 | Everything drawn or registered about the content: numbers printed inside diagram sources, the architecture table-to-connector mapping, the workbook wireframe's panel parity, the absence of invented values in that wireframe, a register entry in `docs/evidence.md` for every committed image, the chart gates actually running in CI, and the social preview card agreeing with the rule files |

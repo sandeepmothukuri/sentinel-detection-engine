@@ -19,6 +19,9 @@ What it does
    other entry, with an empty `Demonstrates` line for you to fill in — the script
    will not write that for you, because only you saw the screen.
 4. **Records a checksum**, so a later reader can tell whether the file changed.
+5. **Flips the shot's status** in `docs/images/capture-manifest.yaml` when you pass
+   `--manifest-id`, so the checklist in that file cannot drift away from what is on
+   disk. `tests/test_evidence.py` fails on the drift either way.
 
 What it refuses to do
 ---------------------
@@ -44,7 +47,11 @@ Usage
         --slug workspace-overview \\
         --purpose "The lab workspace with Sentinel enabled and the connectors connected" \\
         --environment "Single-author lab: Azure free tier, one Log Analytics workspace, E5 developer tenant" \\
-        --redactions "Subscription id and workspace id painted over; tenant domain cropped"
+        --redactions "Subscription id and workspace id painted over; tenant domain cropped" \\
+        --manifest-id sentinel-workspace-overview
+
+The shot list, the portal path for each capture and the redaction checklist live in
+`docs/images/capture-guide.md`.
 
 Then open docs/evidence.md and complete the `Demonstrates` line.
 """
@@ -66,6 +73,7 @@ except ImportError:  # pragma: no cover
 REPO = pathlib.Path(__file__).resolve().parent.parent
 IMAGES = REPO / "docs" / "images"
 EVIDENCE = REPO / "docs" / "evidence.md"
+CAPTURE_MANIFEST = REPO / "docs" / "images" / "capture-manifest.yaml"
 
 AREAS = ["architecture", "sentinel", "detections", "hunting", "soar", "workbooks", "attack", "ci-cd"]
 
@@ -178,6 +186,53 @@ def append_to_register(area: str, entry: str) -> None:
     EVIDENCE.write_text(updated, encoding="utf-8")
 
 
+def mark_captured(text: str, shot_id: str, rel: str, date: str) -> str:
+    """Flip one shot in the capture manifest from pending to captured.
+
+    Text surgery rather than a YAML round-trip, for the same reason the playbook
+    ARM templates are patched by string replacement: re-serialising the file would
+    rewrite every comment in it. The block is located by its `- id:` line and ends
+    at the next one.
+    """
+    lines = text.splitlines(keepends=True)
+    start = next((i for i, l in enumerate(lines) if l.strip() == f"- id: {shot_id}"), None)
+    if start is None:
+        raise IntakeError(
+            f"capture-manifest.yaml has no shot with id '{shot_id}'. Add it to "
+            f"docs/images/capture-manifest.yaml, or drop --manifest-id.")
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("  - id:")),
+               len(lines))
+
+    block = "".join(lines[start:end])
+    if "status: captured" in block:
+        raise IntakeError(f"shot '{shot_id}' is already marked captured in the manifest.")
+    for field, value in (("status:", "captured"), ("file:", rel)):
+        at = next((i for i in range(start, end) if lines[i].strip().startswith(field)), None)
+        if at is None:
+            raise IntakeError(f"shot '{shot_id}' has no '{field}' line to update.")
+        indent = lines[at][:len(lines[at]) - len(lines[at].lstrip())]
+        lines[at] = f"{indent}{field} {value}\n"
+    at = next(i for i in range(start, end) if lines[i].strip().startswith("status:"))
+    # quoted, so YAML hands the date back as text rather than as a date object
+    lines.insert(at + 1,
+                 f'{lines[at][:len(lines[at]) - len(lines[at].lstrip())]}captured: "{date}"\n')
+    return "".join(lines)
+
+
+def update_manifest(shot_id: str, rel: str, date: str, force: bool) -> None:
+    """Record the capture in the manifest, refusing to overwrite a recorded one."""
+    if not CAPTURE_MANIFEST.exists():
+        raise IntakeError(f"{CAPTURE_MANIFEST.relative_to(REPO)} is missing.")
+    text = CAPTURE_MANIFEST.read_text(encoding="utf-8")
+    if force:
+        block_start = text.index(f"- id: {shot_id}")
+        block_end = text.find("- id:", block_start + 1)
+        block = text[block_start:block_end if block_end > 0 else len(text)]
+        text = text[:block_start] + block.replace("status: captured", "status: pending", 1) \
+            .replace("captured: ", "superseded: ", 1) + text[block_end if block_end > 0 else len(text):]
+    CAPTURE_MANIFEST.write_text(mark_captured(text, shot_id, rel, date), encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -192,6 +247,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="what you removed, or 'none required' with the reason")
     parser.add_argument("--date", default=dt.date.today().isoformat())
     parser.add_argument("--notes", default="")
+    parser.add_argument("--manifest-id", default="",
+                        help="id of the shot in docs/images/capture-manifest.yaml; marks it captured")
     parser.add_argument("--force", action="store_true", help="overwrite an existing image and entry")
     args = parser.parse_args(argv)
 
@@ -202,6 +259,19 @@ def main(argv: list[str] | None = None) -> int:
     if not re.match(r"^[a-z0-9-]+$", args.slug):
         print("::error::--slug must be lower-case kebab-case", file=sys.stderr)
         return 2
+
+    manifest_text = CAPTURE_MANIFEST.read_text(encoding="utf-8") if CAPTURE_MANIFEST.exists() else ""
+    if args.manifest_id:
+        if f"- id: {args.manifest_id}" not in manifest_text:
+            print(f"::error::no shot with id '{args.manifest_id}' in "
+                  f"{CAPTURE_MANIFEST.relative_to(REPO)}. See docs/images/capture-guide.md.",
+                  file=sys.stderr)
+            return 2
+        if not args.force and "status: captured" in \
+                manifest_text.split(f"- id: {args.manifest_id}")[1].split("- id:")[0]:
+            print(f"::error::shot '{args.manifest_id}' is already captured. Use --force to supersede it.",
+                  file=sys.stderr)
+            return 2
 
     try:
         image, discarded = load_and_strip(source)
@@ -237,6 +307,14 @@ def main(argv: list[str] | None = None) -> int:
         destination.with_suffix(".png.sha256").unlink(missing_ok=True)
         print(f"::error::{exc}", file=sys.stderr)
         return 2
+
+    if args.manifest_id:
+        try:
+            update_manifest(args.manifest_id, f"docs/images/{rel}", args.date, args.force)
+        except IntakeError as exc:
+            print(f"::warning::{exc}", file=sys.stderr)
+        else:
+            print(f"manifest  {args.manifest_id} -> captured")
 
     print(f"filed     docs/images/{rel}")
     print(f"sha256    {digest[:16]}…")
