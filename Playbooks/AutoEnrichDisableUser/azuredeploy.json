@@ -34,6 +34,11 @@
       "type": "array",
       "defaultValue": [],
       "metadata": { "description": "UPNs that must never be auto-disabled (break-glass accounts, documented service accounts, executive VIPs under manual-only policy)." }
+    },
+    "PrivilegedUserPrincipals": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": { "description": "UPNs holding privileged directory roles (Global Administrator, Privileged Role Administrator, ...). Never auto-disabled: disabling one can lock an organisation out of its own tenant, so the account is commented for analyst authorisation instead. Populate it from your own role assignments — the playbook does not read directory roles, because that needs a Graph role-read permission this deployment does not request. See docs/limitations.md." }
     }
   },
   "variables": {
@@ -66,6 +71,10 @@
             },
             "ExcludedUserPrincipals": {
               "defaultValue": "[parameters('ExcludedUserPrincipals')]",
+              "type": "Array"
+            },
+            "PrivilegedUserPrincipals": {
+              "defaultValue": "[parameters('PrivilegedUserPrincipals')]",
               "type": "Array"
             }
           },
@@ -105,8 +114,13 @@
               "type": "InitializeVariable",
               "inputs": { "variables": [{ "name": "MaxConfidence", "type": "integer", "value": 0 }] }
             },
-            "For_each_IP": {
+            "Init_Enrichment_Summary": {
               "runAfter": { "Init_MaxConfidence": ["Succeeded"] },
+              "type": "InitializeVariable",
+              "inputs": { "variables": [{ "name": "EnrichmentSummary", "type": "string", "value": "" }] }
+            },
+            "For_each_IP": {
+              "runAfter": { "Init_Enrichment_Summary": ["Succeeded"] },
               "type": "Foreach",
               "foreach": "@body('Entities_-_Get_IPs')?['IPs']",
               "actions": {
@@ -128,6 +142,14 @@
                     "queries": { "ipAddress": "@items('For_each_IP')?['Address']", "maxAgeInDays": "90" }
                   }
                 },
+                "Append_Enrichment_Summary": {
+                  "runAfter": { "Update_MaxConfidence": ["Succeeded","Failed","TimedOut"] },
+                  "type": "SetVariable",
+                  "inputs": {
+                    "name": "EnrichmentSummary",
+                    "value": "@concat(variables('EnrichmentSummary'), items('For_each_IP')?['Address'], ' — AbuseIPDB ', coalesce(body('AbuseIPDB_-_Check')?['data']?['abuseConfidenceScore'], 0), '/100, VirusTotal malicious engines: ', coalesce(body('VT_-_IP_Report')?['data']?['attributes']?['last_analysis_stats']?['malicious'], 0), '. ')"
+                  }
+                },
                 "Update_MaxConfidence": {
                   "runAfter": { "AbuseIPDB_-_Check": ["Succeeded","Failed","TimedOut"] },
                   "type": "SetVariable",
@@ -143,19 +165,9 @@
               "type": "If",
               "expression": {
                 "and": [
-                  { "equals": ["@triggerBody()?['object']?['properties']?['severity']", "@parameters('MinimumSeverity')"] },
+                  { "greaterOrEquals": ["@if(equals(triggerBody()?['object']?['properties']?['severity'],'High'),3,if(equals(triggerBody()?['object']?['properties']?['severity'],'Medium'),2,if(equals(triggerBody()?['object']?['properties']?['severity'],'Low'),1,0)))", "@if(equals(parameters('MinimumSeverity'),'High'),3,if(equals(parameters('MinimumSeverity'),'Medium'),2,if(equals(parameters('MinimumSeverity'),'Low'),1,0)))"] },
                   { "greaterOrEquals": ["@variables('MaxConfidence')", "@parameters('DisableUserConfidenceThreshold')"] },
-                  {
-                    "and": [
-                      { "greater": ["@length(body('Entities_-_Get_Accounts')?['Accounts'])", 0] },
-                      {
-                        "and": [
-                          { "not": { "equals": ["@first(body('Entities_-_Get_Accounts')?['Accounts'])?['UserPrincipalName']", ""] } },
-                          { "not": { "contains": ["@parameters('ExcludedUserPrincipals')", "@first(body('Entities_-_Get_Accounts')?['Accounts'])?['UserPrincipalName']]"] } }
-                        ]
-                      }
-                    ]
-                  }
+{ "greater": ["@length(body('Entities_-_Get_Accounts')?['Accounts'])", 0] }
                 ]
               },
               "actions": {
@@ -163,13 +175,42 @@
                   "type": "Foreach",
                   "foreach": "@body('Entities_-_Get_Accounts')?['Accounts']",
                   "actions": {
-                    "AAD_-_Disable_User": {
-                      "type": "ApiConnection",
-                      "inputs": {
-                        "host": { "connection": { "name": "@parameters('$connections')['azuread']['connectionId']" } },
-                        "method": "patch",
-                        "path": "/v1.0/users/@{encodeURIComponent(items('For_each_Account')?['AadUserId'])}",
-                        "body": { "accountEnabled": false }
+                    "Check_Account_Is_Disableable": {
+                      "type": "If",
+                      "expression": {
+                        "and": [
+                          { "not": { "equals": ["@items('For_each_Account')?['UserPrincipalName']", ""] } },
+                          { "not": { "equals": ["@items('For_each_Account')?['UserPrincipalName']", null] } },
+                          { "not": { "contains": ["@parameters('ExcludedUserPrincipals')", "@items('For_each_Account')?['UserPrincipalName']"] } },
+                          { "not": { "contains": ["@parameters('PrivilegedUserPrincipals')", "@items('For_each_Account')?['UserPrincipalName']"] } }
+                        ]
+                      },
+                      "actions": {
+                        "AAD_-_Disable_User": {
+                          "type": "ApiConnection",
+                          "inputs": {
+                            "host": { "connection": { "name": "@parameters('$connections')['azuread']['connectionId']" } },
+                            "method": "patch",
+                            "path": "/v1.0/users/@{encodeURIComponent(items('For_each_Account')?['AadUserId'])}",
+                            "body": { "accountEnabled": false }
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Sentinel_Comment_Account_Skipped": {
+                            "type": "ApiConnection",
+                            "inputs": {
+                              "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+                              "method": "post",
+                              "path": "/Incidents/Comment",
+                              "body": {
+                                "incidentArmId": "@triggerBody()?['object']?['id']",
+                                "message": "Not disabling @{coalesce(items('For_each_Account')?['UserPrincipalName'], '(account without a UPN)')}: the UPN is empty, on ExcludedUserPrincipals, or on PrivilegedUserPrincipals. Privileged and excluded accounts always require an analyst decision — this playbook does not act on them."
+                              }
+                            }
+                          }
+                        }
                       }
                     }
                   },
@@ -184,7 +225,7 @@
                     "path": "/Incidents/Comment",
                     "body": {
                       "incidentArmId": "@triggerBody()?['object']?['id']",
-                      "message": "Auto-action: disabled user(s) @{join(select(body('Entities_-_Get_Accounts')?['Accounts'], (a) => a?['UserPrincipalName']), ', ')}. Max IP reputation confidence: @{variables('MaxConfidence')}. Threshold: @{parameters('DisableUserConfidenceThreshold')}. ROLLBACK: re-enable via Entra ID > Users, or 'Set-AzureADUser -ObjectId <upn> -AccountEnabled $true'."
+                      "message": "Auto-action at severity @{triggerBody()?['object']?['properties']?['severity']}: disabled user(s) @{join(select(body('Entities_-_Get_Accounts')?['Accounts'], (a) => a?['UserPrincipalName']), ', ')}. Evidence — @{variables('EnrichmentSummary')}Max confidence @{variables('MaxConfidence')} against threshold @{parameters('DisableUserConfidenceThreshold')}. Accounts on ExcludedUserPrincipals or PrivilegedUserPrincipals are reported in their own skip comment instead. ROLLBACK: re-enable via Entra ID > Users, or 'Set-AzureADUser -ObjectId <upn> -AccountEnabled $true'."
                     }
                   }
                 },
@@ -212,7 +253,7 @@
                       "path": "/Incidents/Comment",
                       "body": {
                         "incidentArmId": "@triggerBody()?['object']?['id']",
-                        "message": "Enriched @{length(body('Entities_-_Get_IPs')?['IPs'])} IP(s). Max confidence @{variables('MaxConfidence')}. No auto-action taken (severity gate: @{parameters('MinimumSeverity')}, confidence threshold: @{parameters('DisableUserConfidenceThreshold')}, exclusion list: @{length(parameters('ExcludedUserPrincipals'))} entries)."
+                        "message": "Enrichment — @{variables('EnrichmentSummary')}Max confidence @{variables('MaxConfidence')} against threshold @{parameters('DisableUserConfidenceThreshold')}. No auto-action taken (severity floor: @{parameters('MinimumSeverity')}, excluded UPNs: @{length(parameters('ExcludedUserPrincipals'))}, privileged UPNs: @{length(parameters('PrivilegedUserPrincipals'))})."
                       }
                     }
                   }

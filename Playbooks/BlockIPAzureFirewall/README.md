@@ -27,12 +27,15 @@ az deployment group create \
   --resource-group <rg> \
   --template-file azuredeploy.json \
   --parameters PlaybookName=BlockIPAzureFirewall \
-               IpGroupResourceId="/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/ipGroups/secops-blocklist"
+               IpGroupResourceId="/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/ipGroups/secops-blocklist" \
+               MinimumSeverity=High
 ```
 
 ## Safeguards (v1.1)
 
-- The playbook drops RFC1918 addresses **plus** loopback (127/8) and link-local (169.254/16) before merging, so internal IPs can never accidentally hit the blocklist.
+- **Severity floor** — `MinimumSeverity` (default `High`). Adding an address to a firewall deny list is a destructive action like the other two playbooks, so it is gated the same way: incidents *at or above* the floor may push a block, anything below gets a comment. Comparison is by severity rank, so a floor of `Medium` still acts on `High`.
+- **Public IPv4 only** — the playbook drops IPv6 entities rather than guessing: an IP Group entry is a prefix, and `concat(address, '/32')` is meaningless for an IPv6 address, so an IPv6 indicator is reported in the comment as *not blocked*. Addresses are shape-checked (four dot-separated parts, no colon) in a filter that runs **before** any octet arithmetic, because expression `and()` does not short-circuit in Logic Apps: without that guard an IPv6 entity would reach `int()` and fault the run instead of producing a comment. It also drops RFC1918 (10/8, 172.16/12, 192.168/16), loopback (127/8), link-local (169.254/16), carrier-grade NAT (100.64/10), "this network" (0.0.0.0/8) and multicast/reserved (224/4 and above), so an internal or special-use address can never reach the deny list.
+- **Guarded write** — the block only runs when the incident clears the severity floor *and* at least one candidate survives the filter *and* the merged group stays inside the ceiling. Every other path comments instead.
 - **Allowlist** — `AllowlistedIPs` parameter: corporate egress, partner endpoints, and backup destinations are filtered out per-IP before any firewall change.
 - **Ceiling guard** — `MaxIPGroupEntries` (default 1000): if the merged group would exceed the ceiling, nothing is written and the incident gets a comment instead. This protects firewall rule capacity from a runaway incident.
 - Idempotent: re-running with the same IP is a no-op (set-union).

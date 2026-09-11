@@ -24,6 +24,12 @@
       "type": "int",
       "defaultValue": 1000,
       "metadata": { "description": "Safety ceiling: if the merged IP Group would exceed this many entries, the playbook stops and comments instead of updating (protects firewall rule capacity)." }
+    },
+    "MinimumSeverity": {
+      "type": "string",
+      "defaultValue": "High",
+      "allowedValues": ["High", "Medium", "Low", "Informational"],
+      "metadata": { "description": "Severity floor for adding a block: incidents at this severity or higher may push addresses into the deny IP Group, and anything below gets a comment only. Blocking traffic is destructive, so it is gated exactly like the account and device playbooks. The default High means only the top Sentinel severity acts." }
     }
   },
   "variables": {
@@ -46,7 +52,8 @@
             "$connections": { "defaultValue": {}, "type": "Object" },
             "IpGroupResourceId": { "defaultValue": "[parameters('IpGroupResourceId')]", "type": "String" },
             "AllowlistedIPs": { "defaultValue": "[parameters('AllowlistedIPs')]", "type": "Array" },
-            "MaxIPGroupEntries": { "defaultValue": "[parameters('MaxIPGroupEntries')]", "type": "Int" }
+            "MaxIPGroupEntries": { "defaultValue": "[parameters('MaxIPGroupEntries')]", "type": "Int" },
+            "MinimumSeverity": { "defaultValue": "[parameters('MinimumSeverity')]", "type": "String" }
           },
           "triggers": {
             "Microsoft_Sentinel_incident": {
@@ -72,7 +79,7 @@
             "Compose_Candidate_IPs": {
               "runAfter": { "Entities_-_Get_IPs": ["Succeeded"] },
               "type": "Compose",
-              "inputs": "@select(filter(body('Entities_-_Get_IPs')?['IPs'], (x) => and(not(startsWith(x?['Address'], '10.')), not(startsWith(x?['Address'], '192.168.')), not(startsWith(x?['Address'], '172.16.')), not(startsWith(x?['Address'], '172.17.')), not(startsWith(x?['Address'], '172.18.')), not(startsWith(x?['Address'], '172.19.')), not(startsWith(x?['Address'], '172.2')), not(startsWith(x?['Address'], '172.30.')), not(startsWith(x?['Address'], '172.31.')), not(startsWith(x?['Address'], '127.')), not(startsWith(x?['Address'], '169.254.')), not(contains(parameters('AllowlistedIPs'), x?['Address'])))), (y) => concat(y?['Address'], '/32'))"
+              "inputs": "@select(filter(filter(body('Entities_-_Get_IPs')?['IPs'], (a) => and(not(contains(a?['Address'], ':')), equals(length(split(a?['Address'], '.')), 4))), (x) => and(greater(int(first(split(x?['Address'], '.'))), 0), less(int(first(split(x?['Address'], '.'))), 224), not(and(equals(int(first(split(x?['Address'], '.'))), 100), greaterOrEquals(int(second(split(x?['Address'], '.'))), 64), lessOrEquals(int(second(split(x?['Address'], '.'))), 127))), not(startsWith(x?['Address'], '10.')), not(startsWith(x?['Address'], '127.')), not(startsWith(x?['Address'], '169.254.')), not(startsWith(x?['Address'], '172.16.')), not(startsWith(x?['Address'], '172.17.')), not(startsWith(x?['Address'], '172.18.')), not(startsWith(x?['Address'], '172.19.')), not(startsWith(x?['Address'], '172.2')), not(startsWith(x?['Address'], '172.30.')), not(startsWith(x?['Address'], '172.31.')), not(startsWith(x?['Address'], '192.168.')), not(contains(parameters('AllowlistedIPs'), x?['Address'])))), (y) => concat(y?['Address'], '/32'))"
             },
             "Get_IP_Group_Current": {
               "runAfter": { "Compose_Candidate_IPs": ["Succeeded"] },
@@ -93,6 +100,7 @@
               "type": "If",
               "expression": {
                 "and": [
+                  { "greaterOrEquals": ["@if(equals(triggerBody()?['object']?['properties']?['severity'],'High'),3,if(equals(triggerBody()?['object']?['properties']?['severity'],'Medium'),2,if(equals(triggerBody()?['object']?['properties']?['severity'],'Low'),1,0)))", "@if(equals(parameters('MinimumSeverity'),'High'),3,if(equals(parameters('MinimumSeverity'),'Medium'),2,if(equals(parameters('MinimumSeverity'),'Low'),1,0)))"] },
                   { "greater": ["@length(outputs('Compose_Candidate_IPs'))", 0] },
                   { "lessOrEquals": ["@length(outputs('Compose_Merged_IPs'))", "@parameters('MaxIPGroupEntries')"] }
                 ]

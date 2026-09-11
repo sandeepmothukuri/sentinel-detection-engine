@@ -5,9 +5,13 @@ playbooks live in `Playbooks/` and are bound to incident creation by Sentinel au
 
 The governing rule, and the reason the pipeline has three gates rather than one:
 **a query result alone never triggers a destructive action.** Enrichment and ticketing are safe and
-run on every matching incident; containment requires a confidence threshold, an independent
-corroborating signal, and a safety gate that checks for privileged or break-glass accounts, allowlisted
-entities and unclear blast radius before it fires. See [`../SOAR.md`](../SOAR.md) for the playbook
+run on every matching incident; containment requires a severity floor, a confidence threshold, an
+independent corroborating signal, and a safety gate that checks for privileged or break-glass
+accounts, excluded critical devices, allowlisted entities and unclear blast radius before it fires.
+Those checks are parameters, not prose: `MinimumSeverity`, `PrivilegedUserPrincipals`,
+`ExcludedUserPrincipals`, `ExcludedDeviceNames` and `AllowlistedIPs`, each asserted by
+[`tests/test_playbooks.py`](../../tests/test_playbooks.py) so the JSON cannot drift away from this
+flow. See [`../SOAR.md`](../SOAR.md) for the playbook
 parameters and [`../../tests/validation/live-validation-guide.md`](../../tests/validation/live-validation-guide.md)
 for the testing boundaries.
 
@@ -22,7 +26,9 @@ flowchart TD
     B -- Yes --> C[AutoEnrichDisableUser:<br/>VT + AbuseIPDB lookup]
     B -- No --> G
     C --> D{Combined confidence ≥ 80?}
-    D -- Yes --> E[Disable user via Graph<br/>Comment with verdict]
+    D -- Yes --> D2{Severity at or above<br/>MinimumSeverity?}
+    D2 -- Yes --> E[Disable user via Graph<br/>Comment with verdict]
+    D2 -- No --> F
     D -- No --> F[Comment enrichment only]
     E --> G
     F --> G
@@ -72,10 +78,16 @@ Each row reflects a deliberate choice between **speed** and **reversibility cost
 - **Enrich** — always safe, run everywhere.
 - **Ticket** — always safe, run everywhere.
 - **Isolate device** — reversible in seconds and low business impact for an L3-grade detection, so
-  it may run automatically **after** the confidence gate and the safety gate. Isolation against a
-  server, a domain controller or a device with an unresolved allowlist entry routes to analyst review
-  instead: a wrong isolation is cheap to undo but expensive in the fifteen minutes it is wrong.
-- **Disable user** — annoying but reversible in minutes; require a confidence threshold.
+  it may run automatically **after** the severity, confidence and device-exclusion gates. A host on
+  `ExcludedDeviceNames` — a server, a domain controller, a hypervisor, a jump host — routes to
+  analyst review instead, and the exclusion is matched on both the host name and the DNS name. The
+  list is yours to populate: the playbook cannot tell a domain controller from a workstation, so an
+  empty list means every host is eligible. A wrong isolation is cheap to undo but expensive in the
+  fifteen minutes it is wrong.
+- **Disable user** — annoying but reversible in minutes; require a confidence threshold. Accounts on
+  `PrivilegedUserPrincipals` or `ExcludedUserPrincipals` are never auto-disabled, because the
+  rollback for an administrator is not the same as the rollback for a mailbox user: the playbook
+  names them in a skip comment and leaves the call to an analyst.
 - **Revoke OAuth consent / revert NSG / kill workload** — high business impact, manual approval.
 
 The threshold parameter on `AutoEnrichDisableUser` lets the SOC adjust risk tolerance without code changes.

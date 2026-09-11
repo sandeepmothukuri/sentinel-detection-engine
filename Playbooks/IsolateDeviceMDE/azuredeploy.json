@@ -22,7 +22,12 @@
       "type": "string",
       "defaultValue": "High",
       "allowedValues": ["High", "Medium", "Low", "Informational"],
-      "metadata": { "description": "Only incidents with this severity trigger isolation; lower-severity incidents get a comment only." }
+      "metadata": { "description": "Severity floor: incidents at this severity or higher may be isolated, and anything below gets a comment only. The default High means only the top Sentinel severity acts." }
+    },
+    "ExcludedDeviceNames": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": { "description": "Hostnames that must never be auto-isolated: domain controllers, hypervisors, backup and build infrastructure, jump hosts. Isolating one costs more than the incident it responds to. A match is commented for analyst review instead of actioned. Matched against both HostName and ComputerDnsName." }
     }
   },
   "variables": {
@@ -44,7 +49,8 @@
           "parameters": {
             "$connections": { "defaultValue": {}, "type": "Object" },
             "IsolationType": { "defaultValue": "[parameters('IsolationType')]", "type": "String" },
-            "MinimumSeverity": { "defaultValue": "[parameters('MinimumSeverity')]", "type": "String" }
+            "MinimumSeverity": { "defaultValue": "[parameters('MinimumSeverity')]", "type": "String" },
+            "ExcludedDeviceNames": { "defaultValue": "[parameters('ExcludedDeviceNames')]", "type": "Array" }
           },
           "triggers": {
             "Microsoft_Sentinel_incident": {
@@ -72,7 +78,7 @@
               "type": "If",
               "expression": {
                 "and": [
-                  { "equals": ["@triggerBody()?['object']?['properties']?['severity']", "@parameters('MinimumSeverity')"] },
+                  { "greaterOrEquals": ["@if(equals(triggerBody()?['object']?['properties']?['severity'],'High'),3,if(equals(triggerBody()?['object']?['properties']?['severity'],'Medium'),2,if(equals(triggerBody()?['object']?['properties']?['severity'],'Low'),1,0)))", "@if(equals(parameters('MinimumSeverity'),'High'),3,if(equals(parameters('MinimumSeverity'),'Medium'),2,if(equals(parameters('MinimumSeverity'),'Low'),1,0)))"] },
                   { "greater": ["@length(body('Entities_-_Get_Hosts')?['Hosts'])", 0] }
                 ]
               },
@@ -83,7 +89,13 @@
                   "actions": {
                     "Check_Has_MDE_ID": {
                       "type": "If",
-                      "expression": { "and": [{ "not": { "equals": ["@items('For_each_Host')?['MdatpDeviceId']", null] } }] },
+                      "expression": {
+                        "and": [
+                          { "not": { "equals": ["@items('For_each_Host')?['MdatpDeviceId']", null] } },
+                          { "not": { "contains": ["@parameters('ExcludedDeviceNames')", "@coalesce(items('For_each_Host')?['HostName'], '')"] } },
+                          { "not": { "contains": ["@parameters('ExcludedDeviceNames')", "@coalesce(items('For_each_Host')?['ComputerDnsName'], '')"] } }
+                        ]
+                      },
                       "actions": {
                         "MDE_-_Isolate_Machine": {
                           "type": "ApiConnection",
@@ -121,7 +133,7 @@
                               "path": "/Incidents/Comment",
                               "body": {
                                 "incidentArmId": "@triggerBody()?['object']?['id']",
-                                "message": "Host @{items('For_each_Host')?['HostName']} has no MdatpDeviceId entity value — isolation skipped, manual verification required."
+                                "message": "Host @{coalesce(items('For_each_Host')?['HostName'], items('For_each_Host')?['ComputerDnsName'])} was NOT isolated. @{if(contains(parameters('ExcludedDeviceNames'), coalesce(items('For_each_Host')?['HostName'], '')), 'It matches ExcludedDeviceNames — critical infrastructure is never isolated automatically; review and isolate manually if the evidence justifies it.', 'The entity carries no MdatpDeviceId, so there is no device to isolate — resolve it in MDE and act from the portal.')}"
                               }
                             }
                           }

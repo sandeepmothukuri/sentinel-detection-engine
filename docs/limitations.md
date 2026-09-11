@@ -59,7 +59,7 @@ find. One such defect (a parameter reference with the wrong casing) was found by
 own validator rather than by a reviewer.
 
 **Mitigation in place.** The compensating control is mechanical rather than social: 18 validation
-checks in 9 families, 163 tests including negative tests that prove the validator rejects bad input, six drift
+checks in 9 families, 196 tests including negative tests that prove the validator rejects bad input, six drift
 gates, and documentation numbers that fail the build when they stop matching the repository. A
 validator that fails loudly is a partial substitute for a reviewer, and the repository says which
 it has.
@@ -172,6 +172,35 @@ rather than discovered in production.
 translation of a familiar authoring format into the detection style this pack uses.
 
 ---
+
+## L10 — The safety-gate lists are static, and an operator has to keep them current
+
+**The limitation.** Two gates that protect the highest-consequence actions read from parameters a
+human maintains: `PrivilegedUserPrincipals` (directory-role holders that must never be
+auto-disabled) and `ExcludedDeviceNames` (hosts that must never be auto-isolated). The playbooks do
+not derive either list from the tenant. Reading directory role assignments would mean requesting a
+Microsoft Graph role-read permission this deployment deliberately does not ask for, and the MDE
+device inventory would mean a second API surface for a list that changes slowly. The firewall
+playbook is narrower still: it blocks IPv4 only, because an IP Group entry is an address with a
+prefix length, and converting an IPv6 entity into one is not something a `concat(address, '/32')`
+can do correctly.
+
+**What it costs the reader.** A newly assigned Global Administrator is protected only after someone
+adds the UPN to `PrivilegedUserPrincipals`; a domain controller provisioned under a new name is
+eligible for isolation until `ExcludedDeviceNames` is updated; an IPv6 indicator is reported in the
+incident comment but never pushed to the firewall. Empty lists are the failure mode, because an
+empty list is indistinguishable from a considered one at runtime — the playbook cannot tell
+"nothing to exclude" from "nobody has configured this yet".
+
+**Mitigation in place.** `tests/test_playbooks.py` fails the build if the gates stop reading those
+parameters, so the mechanism cannot be edited away; each playbook posts the size of both lists in
+its incident comment, so a comment showing `privileged UPNs: 0` is visible in triage rather than
+hidden in a deployment parameter; [`SOAR.md`](SOAR.md) lists populating them as step zero of the
+enabling path, before any threshold is lowered.
+
+**What closes it.** Populating the lists from the tenant's own role assignments and device
+inventory at deployment time, then reviewing them on a defined cadence. That is an environment
+action with a schedule, not a code change, and it is on the roadmap under that heading.
 
 ## How to use this file
 

@@ -13,17 +13,17 @@ Four Logic App playbooks automate enrichment and containment. The decision pipel
 | Playbook | Trigger binding | Action | Destructive? |
 |---|---|---|---|
 | [AutoEnrichDisableUser](../Playbooks/AutoEnrichDisableUser/README.md) | Any incident (recommend: Entra ID rules) | VT + AbuseIPDB enrichment; disables Entra ID user above confidence + severity + exclusion gates | Yes |
-| [IsolateDeviceMDE](../Playbooks/IsolateDeviceMDE/README.md) | Incidents from `MDE_*` rules | Network-isolates device via MDE `machineActions` | Yes |
-| [BlockIPAzureFirewall](../Playbooks/BlockIPAzureFirewall/README.md) | Incidents with IP entities | Adds public IPs to an Azure Firewall deny IP Group | Yes |
+| [IsolateDeviceMDE](../Playbooks/IsolateDeviceMDE/README.md) | Incidents from `MDE_*` rules | Network-isolates device via MDE `machineActions`, unless the host is on `ExcludedDeviceNames` | Yes |
+| [BlockIPAzureFirewall](../Playbooks/BlockIPAzureFirewall/README.md) | Incidents with IP entities | Adds public IPv4s to an Azure Firewall deny IP Group, above the severity floor and below the ceiling | Yes |
 | [CreateServiceNowTicket](../Playbooks/CreateServiceNowTicket/README.md) | Severity High | Opens a mapped INC record + cross-links | No |
 
 ## Safety model (v1.1)
 
 No playbook in this pack takes a destructive action without all of:
 
-1. **Severity gate** — a `MinimumSeverity` parameter (default `High`, the top Sentinel severity). Lower-severity incidents get an explanatory comment instead of an action.
-2. **Confidence/quality gate** — reputation threshold (disable user) or entity-quality checks (MDE ID present, public IP only).
-3. **Allowlists** — `ExcludedUserPrincipals` (break-glass/VIPs) and `AllowlistedIPs` (corporate egress) are never actioned on.
+1. **Severity floor** — every acting playbook takes `MinimumSeverity` (default `High`, the top Sentinel severity). Incidents *at or above* the floor may act; anything below gets an explanatory comment. The comparison is by severity rank, so raising the floor to the top does not accidentally skip it.
+2. **Confidence/quality gate** — reputation threshold for account disable, and entity-quality checks everywhere: an account needs a UPN and an Entra object id, a host needs an MDE device id, a firewall candidate needs a public IPv4 address.
+3. **Allowlists** — `ExcludedUserPrincipals` (break-glass/VIPs), `PrivilegedUserPrincipals` (directory-role holders), `ExcludedDeviceNames` (domain controllers, hypervisors, jump hosts) and `AllowlistedIPs` (corporate egress) are never actioned on. Excluded and privileged entities are named in a skip comment so the decision is visible in triage, not silent. Populate these lists before lowering any threshold; an empty list excludes nothing.
 4. **Ceilings** — the firewall blocklist refuses to exceed `MaxIPGroupEntries` rather than half-update.
 5. **Audit trail** — every action *and* no-action path posts a comment to the incident stating what ran, the thresholds, and the rollback command.
 6. **Failure visibility** — failed or unconfirmed actions raise a loud `WARNING` comment so an analyst closes the loop manually.
@@ -38,12 +38,15 @@ it should not run on day one. The onboarding path that matches how these paramet
    allowlist empty of nothing — instead scope its automation rule to nothing) so every path
    enriches and comments but never acts. No code change is needed: a threshold above the scale is
    the off switch.
-2. **Read the comments.** They state the observed confidence, the severity gate and the exclusion
-   list for every incident. That is the data a threshold decision needs.
-3. **Lower the threshold with a tuning-log entry** naming the incident numbers that justified it,
+2. **Populate the exclusion lists before anything else.** `ExcludedUserPrincipals`,
+   `PrivilegedUserPrincipals`, `ExcludedDeviceNames` and `AllowlistedIPs` are the difference between
+   a gate and a formality; the comments print their sizes so an empty one is visible.
+3. **Read the comments.** They state the observed confidence, the per-IP evidence, the severity
+   floor and the exclusion list for every incident. That is the data a threshold decision needs.
+4. **Lower the threshold with a tuning-log entry** naming the incident numbers that justified it,
    then leave the allowlists in place. Relaxing a gate without a recorded reason is how an
    automation earns a bad reputation.
-4. **Scope the automation rule, not just the playbook.** Bind each playbook to the smallest set of
+5. **Scope the automation rule, not just the playbook.** Bind each playbook to the smallest set of
    rules and severities that still makes it useful; the gates are a second line, not the first.
 
 ## What is deliberately NOT automated
@@ -57,7 +60,7 @@ it should not run on day one. The onboarding path that matches how these paramet
 |---|---|
 | Disable user | `Set-AzureADUser -ObjectId <upn> -AccountEnabled $true` (embedded in comment) |
 | Device isolation | MDE portal → Release from isolation |
-| Blocked IP | Remove the `/32` from the IP Group |
+| Blocked IP | Remove the `/32` from the IP Group (IPv4 only — an IPv6 entity is reported, never blocked) |
 | ServiceNow ticket | Close INC via normal process |
 
 ## Binding playbooks

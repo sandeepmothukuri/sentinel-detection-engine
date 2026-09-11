@@ -202,8 +202,10 @@ secrets. The script removes what is attached to the file, not what is on the scr
 - **Provenance class:** Diagram
 - **Source:** `docs/diagrams/soar/01-soar-safety-gate-flow.mmd`
 - **Environment:** None. The confidence and safety-gate parameters shown are the defaults
-  declared in the playbooks' ARM templates (`MinimumSeverity`, `DisableUserConfidenceThreshold`
-  and the allowlist parameters).
+  declared in the playbooks' ARM templates (`MinimumSeverity`, `DisableUserConfidenceThreshold`,
+  and the exclusion and allowlist parameters: `ExcludedUserPrincipals`, `PrivilegedUserPrincipals`,
+  `ExcludedDeviceNames`, `AllowlistedIPs`). Each of those gates is asserted against the deployed
+  JSON by `tests/test_playbooks.py`.
 - **Date:** 2026-09-11
 - **Demonstrates:** The control that matters most in this repository: a destructive action
   (disable account, isolate device, block IP) is never taken because a query returned rows. The
