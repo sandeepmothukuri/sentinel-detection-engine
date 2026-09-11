@@ -38,7 +38,7 @@
 
 ### Generated-artefact drift
 
-These four gates all mean the same thing: a file that is derived from other files no longer matches
+These six gates all mean the same thing: a file that is derived from other files no longer matches
 them. The fix is always to run the generator and commit what it writes — never to hand-edit the
 generated file, and never to regenerate the *source* from the artefact.
 
@@ -49,6 +49,8 @@ generated file, and never to regenerate the *source* from the artefact.
 | `deploy/ is stale`, `… is missing`, `… has no corresponding rule` | `python scripts/generate_arm_templates.py`, commit the result |
 | `docs/metrics-matrix.md is stale` | `python scripts/generate_metrics_matrix.py`, commit the result |
 | `design preview digest mismatch` | The workbook changed and the preview PNG did not: `python scripts/render_design_preview.py`, commit the image and its `.sha256` |
+| `… is stale: the numbers changed in …` | A rule, hunt or ledger entry changed and the chart still shows the old value: `python scripts/render_project_charts.py`, commit the images and `docs/images/generated-charts.json` |
+| `… does not match the digest recorded` | A chart PNG was edited or replaced by hand: redraw it with `python scripts/render_project_charts.py` and commit both files |
 
 ### Validation failures
 
