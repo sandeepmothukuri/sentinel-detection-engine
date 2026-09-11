@@ -66,6 +66,33 @@ GRID = "#d7dbe0"
 BG = "#ffffff"
 ACCENT = "#1f6feb"
 SEV_COLOURS = {"High": "#b42318", "Medium": "#b54708", "Low": "#175cd3", "Informational": "#475467"}
+
+# One typography stack and one greys scale for every chart in the repository, so
+# the coverage chart and the inventory panels read as pages from the same report.
+# The font list mirrors the Mermaid theme in render_diagrams.py; matplotlib falls
+# through to whatever is installed, so this stays deterministic inside a container.
+plt.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Segoe UI", "Helvetica Neue", "Helvetica", "Arial", "DejaVu Sans"],
+    "axes.titlesize": 12,
+    "axes.titleweight": "semibold",
+    "axes.labelcolor": MUTED,
+    "text.color": INK,
+    "xtick.color": MUTED,
+    "ytick.color": MUTED,
+    "xtick.major.size": 0,
+    "ytick.major.size": 0,
+    "axes.edgecolor": GRID,
+    "figure.facecolor": BG,
+    "savefig.facecolor": BG,
+})
+
+# Rendered at 200 dpi. At 100 the text was visibly soft the moment anyone opened
+# the PNG at full size or dropped it into a slide, which is where these images are
+# actually read. Doubling the resolution of a vector source costs nothing in
+# fidelity and nothing in determinism - the gate recomputes the numbers, it does
+# not compare bytes.
+CHART_DPI = 200
 TACTIC_ORDER_FALLBACK = [
     "Reconnaissance", "ResourceDevelopment", "InitialAccess", "Execution", "Persistence",
     "PrivilegeEscalation", "DefenseEvasion", "CredentialAccess", "Discovery", "LateralMovement",
@@ -111,9 +138,12 @@ def emit(fig, rel: str, data: dict, **kwargs) -> pathlib.Path:
     CHART_DATA[rel] = json.loads(json.dumps(data, sort_keys=True))  # plain, comparable types
     path = IMAGES / rel
     kwargs.setdefault("facecolor", BG)
+    # dpi defaults to the data-chart resolution but a caller may pin it: the social
+    # preview must stay at GitHub's exact 1280x640, which is dpi=100 for its figure.
+    kwargs.setdefault("dpi", CHART_DPI)
     if State.save:
         path.parent.mkdir(parents=True, exist_ok=True)
-        save_without_metadata(fig, path, dpi=100, **kwargs)
+        save_without_metadata(fig, path, **kwargs)
     plt.close(fig)
     return path
 
@@ -173,7 +203,7 @@ def chart_coverage_redundancy() -> pathlib.Path:
     # Assert rather than trust: every covered technique lands in exactly one bucket.
     assert sum(value for _, value, _ in bars) == len(covered), "buckets must partition the coverage"
 
-    fig, ax = plt.subplots(figsize=(11.5, 3.6), dpi=100)
+    fig, ax = plt.subplots(figsize=(11.5, 3.6), dpi=CHART_DPI)
     fig.patch.set_facecolor(BG)
     for index, (label, value, colour) in enumerate(bars):
         ax.barh([label], [value], height=0.5, color=colour, edgecolor="white")
@@ -221,7 +251,7 @@ def chart_inventory() -> pathlib.Path:
             doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
             connectors.update(c.get("connectorId") for c in doc.get("requiredDataConnectors") or [])
 
-    fig, axes = plt.subplots(2, 2, figsize=(12.2, 7.2), dpi=100)
+    fig, axes = plt.subplots(2, 2, figsize=(12.2, 7.2), dpi=CHART_DPI)
     fig.patch.set_facecolor(BG)
     fig.suptitle(f"Detection inventory — {len(detections)} scheduled rules, {len(hunting)} hunting queries",
                  fontsize=14, weight="bold", color=INK, y=0.98)
@@ -307,7 +337,7 @@ def chart_validation_status() -> pathlib.Path:
     citations = sum(len([c for c in (e.get("checks") or []) if c.get("atomic")]) for e in entries)
     statuses = collections.Counter(e["status"] for e in entries)
 
-    fig, ax = plt.subplots(figsize=(11.5, 4.8), dpi=100)
+    fig, ax = plt.subplots(figsize=(11.5, 4.8), dpi=CHART_DPI)
     fig.patch.set_facecolor(BG)
 
     bars = [
@@ -417,6 +447,9 @@ def chart_social_card() -> pathlib.Path:
     ax.text(70, 52, f"{licence} licensed · generated artefacts drift-gated in CI",
             fontsize=10.5, color="#8fa2bb")
 
+    # GitHub renders the social preview at exactly 1280x640 and crops anything
+    # else, so this figure keeps dpi=100 while the data charts moved to 200: the
+    # card must be the size GitHub expects, not the size that looks best zoomed in.
     return emit(fig, "social/preview-card.png", {
         "rules": len(detections),
         "hunting_queries": len(hunting),
@@ -425,7 +458,7 @@ def chart_social_card() -> pathlib.Path:
         "telemetry_tables": len(tables),
         "playbooks": len(playbooks),
         "atomic_citations": citations,
-    }, facecolor="#0b1220")
+    }, facecolor="#0b1220", dpi=100)
 
 
 BUILDERS = {

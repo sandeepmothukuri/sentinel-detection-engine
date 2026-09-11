@@ -36,7 +36,7 @@
           "T1686.001": 2
         }
       },
-      "sha256": "39b094dd5b3620e94944b8f7070f7c68ec88e3e68ceccadad7868f0144399919"
+      "sha256": "e42dc2e0c4d7a4a3faf944fc4461792f98902af8e5ffa49567affea130c58307"
     },
     "detections/04-inventory-overview.png": {
       "data": {
@@ -69,7 +69,7 @@
           "Medium": 4
         }
       },
-      "sha256": "453b787f860e7c177ece0ff67435687de4a29581d5a9d327e0396a967dc91bd4"
+      "sha256": "056de57432623fe945d8cc4efa31623e15626c544e261dde48654db84186efcc"
     },
     "sentinel/03-validation-status.png": {
       "data": {
@@ -82,7 +82,7 @@
         },
         "trigger_atomic_cited": 11
       },
-      "sha256": "ef455ff658e1e2537089f1c314974ee650c071334cd06927148d85b19d557fed"
+      "sha256": "8ee10f08dc68c23840f14b2c7b6c635b65b47c7cab4ec69080673e08b11b9a62"
     },
     "social/preview-card.png": {
       "data": {

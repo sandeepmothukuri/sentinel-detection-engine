@@ -202,3 +202,46 @@ def test_the_social_card_states_the_same_numbers_as_the_rule_files():
     assert card["rules"] == rules
     assert card["hunting_queries"] == hunts
     assert card["attack_techniques"] == len(layer["techniques"])
+
+
+def test_the_coverage_chart_states_the_numbers_the_documents_state():
+    """The coverage chart is a picture of a claim the repository makes in words.
+
+    It had no number gate at all, and it was wrong: this script keyed its data by
+    `tactic.lower()` and looked the result up in its own kebab-case label table, so
+    `CredentialAccess` became `credentialaccess`, matched nothing, and the chart drew
+    "no coverage" for six tactics that had rules — a coverage chart that understated
+    coverage, for as long as it existed. Nothing could see it, because the only check
+    on the file was a digest, and a digest only proves the bytes have not changed.
+
+    The numbers are now recomputed from the same sources the chart draws from — the
+    rule files and the vendored ATT&CK dataset — and held to `coverage.md` and
+    `attack-navigator/layer.json`, so the picture and the documents cannot disagree.
+    """
+    sys.path.insert(0, str(REPO / "scripts"))
+    from render_coverage_chart import tactic_rows  # noqa: PLC0415
+
+    rows, techniques, covered = tactic_rows()
+    layer = json.loads((REPO / "attack-navigator" / "layer.json").read_text(encoding="utf-8"))
+    coverage = (REPO / "coverage.md").read_text(encoding="utf-8")
+
+    assert techniques == len(layer["techniques"]), (
+        f"the chart counts {techniques} techniques; the Navigator layer has "
+        f"{len(layer['techniques'])}")
+    stated = re.search(r"Tactics covered:\*\* (\d+) of (\d+)", coverage)
+    assert stated, "coverage.md no longer states a tactic coverage total"
+    assert covered == int(stated.group(1)), (
+        f"the chart covers {covered} tactics; coverage.md says {stated.group(1)}")
+    assert len(rows) == int(stated.group(2)), (
+        f"the chart draws {len(rows)} tactics; coverage.md counts {stated.group(2)}")
+
+    # The specific defect: a tactic with rules can never be drawn as uncovered.
+    rule_tactics = set()
+    for folder in ("Detections", "Hunting Queries"):
+        for path in sorted((REPO / folder).glob("*.yaml")):
+            rule = yaml.safe_load(path.read_text(encoding="utf-8"))
+            rule_tactics.update(t.replace("-", "").lower() for t in (rule.get("tactics") or []))
+    drawn_as_empty = {name.replace("-", "").lower() for name, d, h in rows if d + h == 0}
+    assert not (drawn_as_empty & rule_tactics), (
+        "the chart draws these tactics as having no coverage while rules declare them: "
+        f"{sorted(drawn_as_empty & rule_tactics)}")

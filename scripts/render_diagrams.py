@@ -58,6 +58,43 @@ LAYOUT: dict[str, tuple[str, int]] = {
 
 USER_AGENT = "sentinel-detection-engine-diagram-renderer/1.0"
 
+# One palette for every diagram in the repository, sent to the renderer as Mermaid
+# configuration rather than hand-styled per figure. Mermaid's stock themes are
+# functional but inconsistent: `neutral` renders diagrams in flat grey, `default`
+# in saturated purple-blue, and either way two diagrams drawn a month apart do not
+# look like they came from the same document. This is Mermaid's `base` theme with
+# the variables pinned to the palette used across the documentation — navy for
+# structure, slate for edges, a very light blue fill — so a reader moving between
+# the architecture diagram and the SOAR gate diagram is not re-learning the
+# visual language each time. It also sets the spacing outright, because the default
+# node packing is tight enough that edge labels collide on wider flows.
+MERMAID_THEME: dict = {
+    "theme": "base",
+    "themeVariables": {
+        "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif",
+        "fontSize": "14px",
+        "primaryColor": "#eaf1fa",
+        "primaryTextColor": "#12161c",
+        "primaryBorderColor": "#1f4e79",
+        "secondaryColor": "#f4f6f9",
+        "tertiaryColor": "#ffffff",
+        "lineColor": "#5a6472",
+        "textColor": "#12161c",
+        "mainBkg": "#eaf1fa",
+        "nodeBorder": "#1f4e79",
+        "clusterBkg": "#f7f9fc",
+        "clusterBorder": "#c8d3e0",
+        "edgeLabelBackground": "#ffffff",
+    },
+    "flowchart": {
+        "curve": "basis",
+        "nodeSpacing": 45,
+        "rankSpacing": 60,
+        "padding": 12,
+        "useMaxWidth": False,
+    },
+}
+
 
 class RenderError(RuntimeError):
     pass
@@ -75,7 +112,7 @@ def source_body(path: pathlib.Path) -> str:
 
 def render(code: str, width: int, timeout: int = 60) -> bytes:
     payload = base64.urlsafe_b64encode(
-        json.dumps({"code": code, "mermaid": {"theme": "neutral"}}).encode("utf-8")
+        json.dumps({"code": code, "mermaid": MERMAID_THEME}).encode("utf-8")
     ).decode("ascii")
     size = f"&width={width}" if width else ""
     url = f"{RENDERER}{payload}?type=png{size}&bgColor=FFFFFF"
