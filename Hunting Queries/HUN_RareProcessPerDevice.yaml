@@ -1,0 +1,59 @@
+id: 9b1a4e0d-2c3f-4e7b-8d22-8f5e1d3c9b02
+name: HUN - Rare Process Per Device (org-wide rarity)
+description: |
+  Hypothesis - A binary that runs on exactly 1 device estate-wide is either a
+  developer toolchain leak, niche LOB software, or attacker tooling. Surface
+  process executions where the SHA1 has been seen on <= 2 devices in the last
+  14 days.
+hypothesis: |
+  Attacker tooling (credential dumpers, loaders, tunnelers) executes on a
+  handful of machines only, so its hash shows near-zero estate-wide device
+  counts. If true, filtering for low device counts plus non-standard install
+  paths surfaces post-exploitation tooling that AV never flagged.
+requiredTelemetry: |
+  DeviceProcessEvents via Microsoft Defender for Endpoint with SHA1
+  population (default).
+tactics:
+  - Execution
+  - DefenseEvasion
+relevantTechniques:
+  - T1059
+  - T1027
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+query: |
+  let lookback = 14d;
+  DeviceProcessEvents
+  | where TimeGenerated > ago(lookback)
+  | where isnotempty(SHA1)
+  | summarize Devices = dcount(DeviceId), DeviceNames = make_set(DeviceName, 5),
+              FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated),
+              SampleCmd = any(ProcessCommandLine), Folder = any(FolderPath)
+            by SHA1, FileName
+  | where Devices <= 2
+  | where Folder !startswith @"C:\Program Files"
+       and Folder !startswith @"C:\Windows\WinSxS"
+  | sort by LastSeen desc
+expectedFindings: |
+  - Developer builds, portable utilities, and one-off scripts run locally —
+    the bulk of rows on engineering estates.
+  - Renamed admin tools (often the first step of an attacker blending in).
+  - Any row whose SampleCmd references network shares, encoded payloads, or
+    credential keywords is a priority.
+investigationSteps: |
+  1. Triage by Folder: user-writable paths first (%TEMP%, %APPDATA%, Downloads).
+  2. Hash-check against VirusTotal / internal whitelist; check signature.
+  3. Interview the device owner or check change tickets for the binary.
+  4. Unexplained + unsigned + user-writable path = isolate and forensicate.
+escalation: |
+  Escalate when the binary is unsigned, runs as SYSTEM, or appears on a
+  server-class device (a rare hash on a server is much more suspicious than
+  on a developer workstation).
+limitations: |
+  The 2-device threshold and the folder filter make this a precision-oriented
+  hunt; it will miss tooling deliberately executed from Program Files. 14d
+  lookback requires a workspace that keeps that volume of process events
+  (cost consideration for large estates).
+version: 1.1.0

@@ -1,0 +1,89 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a05
+name: M365 - Suspicious Inbox Rule (Forward / Delete)
+description: |
+  Detects creation or modification of inbox rules that auto-forward to external
+  recipients, redirect mail, move messages to RSS / Conversation History /
+  Deleted Items / Junk / Archive, or match attacker-style keywords (invoice,
+  payment, wire, password, OTP). Classic BEC persistence — attacker creates a
+  hidden rule that quarantines security notifications from the inbox of a
+  compromised user.
+severity: High
+status: Available
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Collection
+  - Exfiltration
+  - DefenseEvasion
+relevantTechniques:
+  - T1114.003
+  - T1564.008
+query: |
+  let sensitive_folders = dynamic(["RSS Feeds","RSS Subscriptions","Conversation History","Deleted Items","Junk Email","Archive"]);
+  let suspicious_keywords = dynamic(["invoice","payment","wire","bank","password","otp","mfa","security","reset"]);
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where Operation in ("New-InboxRule","Set-InboxRule","UpdateInboxRules")
+  | mv-expand p = Parameters
+  | extend PName = tostring(p.name), PValue = tostring(p.value)
+  | extend CleanValue = replace_regex(PValue, @"^\[|\]$|""", "")
+  | extend TargetEmail = iff(PName in ("ForwardTo","RedirectTo","ForwardAsAttachmentTo"),
+                             extract(@"([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+)", 1, CleanValue), "")
+  | extend UserDomain = tolower(tostring(split(UserId, "@")[1]))
+  | extend ExternalForward = isnotempty(TargetEmail)
+                            and tolower(tostring(split(TargetEmail, "@")[1])) != UserDomain
+  | where ExternalForward
+       or (PName == "MoveToFolder" and CleanValue in (sensitive_folders))
+       or (PName == "SubjectContainsWords" and CleanValue has_any (suspicious_keywords))
+  | extend ParamDetail = strcat(PName, ": ", CleanValue)
+  | summarize Params = make_set(ParamDetail), RuleName = make_set(iff(PName == "Name", CleanValue, ""))
+            by TimeGenerated, UserId, Operation, ClientIP
+  | project TimeGenerated, UserId, ClientIP, Operation, RuleName, Params
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserId
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: ClientIP
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT6H
+    matchingMethod: Selected
+    groupByEntities:
+      - Account
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: OfficeActivity (Office 365 connector, Exchange workload). Parameters is a dynamic array of name/value pairs; the query mv-expands it, so it is robust to parameter ordering and multi-value fields.
+  falsePositives: |
+    - Users who forward mail to personal addresses or delegate assistants (policy
+      question, not necessarily compromise).
+    - Marketing/ops rules matching "invoice"/"payment" keywords and filing mail to
+      Deleted Items or Archive.
+  tuningGuidance: |
+    - Tune keywords list for your mail culture; keep move-to-RSS / Conversation
+      History at High signal (almost no legitimate rule targets those folders).
+    - Add a tenant-domain allowlist for legitimate forwarding partners by extending
+      the ExternalForward comparison.
+    - Prefer an Exchange transport rule that blocks external auto-forward entirely —
+      this detection then acts as the control verification.
+  suppression: |
+    No static suppression. Handle known-forwarding users via process, not via
+    suppression, so that changes in their behaviour stay visible.
+  expectedVolume: Very low; typically single incidents per week or less in a tenant that blocks external forwarding.
+version: 1.1.0

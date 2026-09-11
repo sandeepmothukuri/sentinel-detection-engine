@@ -1,0 +1,61 @@
+id: 9b1a4e0d-2c3f-4e7b-8d22-8f5e1d3c9b0a
+name: HUN - Lateral SSH/RDP From Workstation
+description: |
+  Hypothesis - Standard end-user workstations should almost never initiate SSH
+  (22) or RDP (3389) to other internal hosts. Surface these connections to
+  catch lateral movement post-compromise.
+hypothesis: |
+  A compromised workstation is being used for lateral movement over SSH or
+  RDP to reachable internal hosts. If true, one workstation will show
+  fan-out connections to many internal targets on 22/3389 within a short
+  window, typically under an interactive user account.
+requiredTelemetry: |
+  DeviceNetworkEvents + DeviceInfo via Microsoft Defender for Endpoint.
+  DeviceType must classify the device as Workstation (MDE osArchitecture /
+  deviceGroup tags inform DeviceInfo).
+tactics:
+  - LateralMovement
+  - Discovery
+relevantTechniques:
+  - T1021.001
+  - T1021.004
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceNetworkEvents
+      - DeviceInfo
+query: |
+  let workstations =
+    DeviceInfo
+    | where TimeGenerated > ago(7d)
+    | summarize arg_max(TimeGenerated, *) by DeviceId
+    | where DeviceType == "Workstation"
+    | project DeviceId, DeviceName;
+  DeviceNetworkEvents
+  | where TimeGenerated > ago(24h)
+  | where RemotePort in (22, 3389)
+  | where RemoteIPType == "Private"
+  | join kind=inner workstations on DeviceId
+  | summarize Connections = count(), Targets = make_set(RemoteIP, 25),
+              Procs = make_set(InitiatingProcessFileName, 5)
+            by DeviceName, AccountName, RemotePort, bin(TimeGenerated, 1h)
+  | where Connections >= 1
+expectedFindings: |
+  - IT admins remoting into servers from management workstations (expected if
+    your admin model routes RDP through a PAW — verify the source device).
+  - Developers SSH-ing to build servers.
+  - A user workstation hitting >5 internal targets/hour is the real signal.
+investigationSteps: |
+  1. Fan-out analysis: count distinct Targets per DeviceName; outliers first.
+  2. Identify the initiating process (mstsc.exe vs ssh.exe vs unexpected binary).
+  3. Check the source account for recent compromise indicators.
+  4. If confirmed lateral movement: contain the source, enumerate all targets,
+     and check each for the same account's successful logons.
+escalation: |
+  Escalate when >5 targets per hour, targets include domain controllers or
+  file servers, or the initiating process is not a standard remote client.
+limitations: |
+  Requires DeviceInfo classification; servers misclassified as workstations
+  will pollute results. NAT'd remote-user traffic (VPN concentrator doing
+  SNAT) shows the concentrator as source, not the workstation.
+version: 1.1.0

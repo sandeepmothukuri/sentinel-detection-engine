@@ -1,0 +1,80 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a04
+name: Entra ID - Service Principal Credential Added
+description: |
+  Detects "Update application - Certificates and secrets management" or
+  "Add service principal credentials" operations. SP credential additions are
+  a known persistence mechanism (Midnight Blizzard / NOBELIUM TTP) — once an
+  attacker has Application Admin rights they add a new client secret to a
+  legitimate enterprise app and use it as a persistent backdoor that survives
+  password resets.
+severity: High
+status: Available
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - PrivilegeEscalation
+relevantTechniques:
+  - T1098.001
+query: |
+  let excluded_actors = dynamic([]);
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName in (
+      "Update application - Certificates and secrets management",
+      "Update application – Certificates and secrets management",
+      "Update service principal - Certificates and secrets management",
+      "Update service principal – Certificates and secrets management",
+      "Add service principal credentials"
+    )
+  | extend Actor = tostring(InitiatedBy.user.userPrincipalName)
+  | extend ActorApp = tostring(InitiatedBy.app.displayName)
+  | extend TargetApp = tostring(TargetResources[0].displayName)
+  | extend TargetId = tostring(TargetResources[0].id)
+  | where Actor !in (excluded_actors)
+  | project TimeGenerated, OperationName, Actor, ActorApp, TargetApp, TargetId,
+            Result, AdditionalDetails
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+  - entityType: CloudApplication
+    fieldMappings:
+      - identifier: Name
+        columnName: TargetApp
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT1H
+    matchingMethod: Selected
+    groupByEntities:
+      - Account
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: AuditLogs (Entra ID connector). Operation names are matched against both hyphen and en-dash variants because Microsoft has changed the dash character between API versions.
+  falsePositives: |
+    - CI/CD pipelines and IT automation (Intune, provisioning tools) that rotate
+      their own app credentials — these appear as ActorApp, not a human Actor.
+    - Admins performing scheduled secret rotation during change windows.
+  tuningGuidance: |
+    - Populate excluded_actors with the UPNs of service principals/automation
+      identities ONLY if they are covered by a documented rotation process.
+    - Prefer alerting on everything and triaging by ActorApp; volume is usually low
+      enough to review every event.
+  suppression: |
+    No static suppression. Actor allow-listing is the supported tuning path.
+  expectedVolume: Low; every event is worth reviewing given the TTP's track record.
+version: 1.1.0

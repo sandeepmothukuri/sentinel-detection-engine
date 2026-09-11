@@ -1,0 +1,252 @@
+{
+  "name": "sentinel-detection-engine coverage",
+  "versions": {
+    "attack": "18",
+    "navigator": "5.1.0",
+    "layer": "4.5"
+  },
+  "domain": "enterprise-attack",
+  "description": "ATT&CK coverage produced by github.com/sandeepmothukuri/sentinel-detection-engine",
+  "techniques": [
+    {
+      "techniqueID": "T1021.001",
+      "score": 25,
+      "color": "",
+      "comment": "HUN - Lateral SSH/RDP From Workstation (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1021.004",
+      "score": 25,
+      "color": "",
+      "comment": "HUN - Lateral SSH/RDP From Workstation (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1027",
+      "score": 75,
+      "color": "",
+      "comment": "MDE - PowerShell EncodedCommand With Long Payload (Detection); HUN - Rare Process Per Device (org-wide rarity) (Hunt); HUN - Unsigned Binary Execution From Temp/AppData (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1053.005",
+      "score": 25,
+      "color": "",
+      "comment": "HUN - New Scheduled Task With Script Action (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1059",
+      "score": 50,
+      "color": "",
+      "comment": "HUN - Office Apps Spawning Script Interpreters (Hunt); HUN - Rare Process Per Device (org-wide rarity) (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1059.001",
+      "score": 25,
+      "color": "",
+      "comment": "MDE - PowerShell EncodedCommand With Long Payload (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1071.001",
+      "score": 25,
+      "color": "",
+      "comment": "MDE - rundll32 With External Network Connection (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1071.004",
+      "score": 25,
+      "color": "",
+      "comment": "HUN - DNS Queries to Free / Dynamic / Tunneling TLDs (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1078.004",
+      "score": 100,
+      "color": "",
+      "comment": "Entra ID - Impossible Travel Between Sign-Ins (Detection); Entra ID - Successful Legacy Auth Sign-In (Detection); HUN - First-Seen ASN per User (30-day baseline) (Hunt); HUN - Sign-In From Hosting / Datacenter ASN (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1087.004",
+      "score": 25,
+      "color": "",
+      "comment": "Azure - Key Vault Secret Access Spike Per Identity (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1090.003",
+      "score": 25,
+      "color": "",
+      "comment": "HUN - Sign-In From Hosting / Datacenter ASN (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1098.001",
+      "score": 50,
+      "color": "",
+      "comment": "Entra ID - Service Principal Credential Added (Detection); M365 - Suspicious OAuth Consent to Unverified Publisher (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1098.003",
+      "score": 25,
+      "color": "",
+      "comment": "HUN - Guest User Added To Privileged Role / Group (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1110",
+      "score": 25,
+      "color": "",
+      "comment": "Entra ID - Successful Legacy Auth Sign-In (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1110.003",
+      "score": 25,
+      "color": "",
+      "comment": "Entra ID - MFA Fatigue Followed by Success (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1114.003",
+      "score": 50,
+      "color": "",
+      "comment": "M365 - Suspicious Inbox Rule (Forward / Delete) (Detection); HUN - Mailbox Forwarding to External Domain (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1136.003",
+      "score": 25,
+      "color": "",
+      "comment": "HUN - Guest User Added To Privileged Role / Group (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1190",
+      "score": 25,
+      "color": "",
+      "comment": "Azure - NSG Rule Opens Port to 0.0.0.0/0 (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1204.002",
+      "score": 25,
+      "color": "",
+      "comment": "HUN - Unsigned Binary Execution From Temp/AppData (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1213.002",
+      "score": 25,
+      "color": "",
+      "comment": "M365 - Mass SharePoint / OneDrive Download (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1218.005",
+      "score": 25,
+      "color": "",
+      "comment": "MDE - mshta Executing Remote Script (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1218.011",
+      "score": 25,
+      "color": "",
+      "comment": "MDE - rundll32 With External Network Connection (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1528",
+      "score": 25,
+      "color": "",
+      "comment": "M365 - Suspicious OAuth Consent to Unverified Publisher (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1539",
+      "score": 25,
+      "color": "",
+      "comment": "Entra ID - Impossible Travel Between Sign-Ins (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1555.005",
+      "score": 25,
+      "color": "",
+      "comment": "Azure - Key Vault Secret Access Spike Per Identity (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1564.008",
+      "score": 25,
+      "color": "",
+      "comment": "M365 - Suspicious Inbox Rule (Forward / Delete) (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1566.001",
+      "score": 25,
+      "color": "",
+      "comment": "HUN - Office Apps Spawning Script Interpreters (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1567.002",
+      "score": 25,
+      "color": "",
+      "comment": "M365 - Mass SharePoint / OneDrive Download (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1568.002",
+      "score": 25,
+      "color": "",
+      "comment": "HUN - DNS Queries to Free / Dynamic / Tunneling TLDs (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1621",
+      "score": 25,
+      "color": "",
+      "comment": "Entra ID - MFA Fatigue Followed by Success (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1686.001",
+      "score": 25,
+      "color": "",
+      "comment": "Azure - NSG Rule Opens Port to 0.0.0.0/0 (Detection)",
+      "enabled": true
+    }
+  ],
+  "gradient": {
+    "colors": [
+      "#dde4ee",
+      "#2776d6",
+      "#0d3a76"
+    ],
+    "minValue": 0,
+    "maxValue": 100
+  },
+  "legendItems": [
+    {
+      "label": "1 rule",
+      "color": "#dde4ee"
+    },
+    {
+      "label": "2 rules",
+      "color": "#2776d6"
+    },
+    {
+      "label": "3+ rules",
+      "color": "#0d3a76"
+    }
+  ]
+}

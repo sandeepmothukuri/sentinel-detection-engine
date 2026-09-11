@@ -1,0 +1,77 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a0a
+name: MDE - PowerShell EncodedCommand With Long Payload
+description: |
+  Detects powershell.exe / pwsh.exe invocations with -EncodedCommand (or short
+  aliases -enc, -e, -ec) and a Base64 payload longer than 250 chars. Decodes
+  short payloads inline. Long encoded command lines are almost always malicious
+  in non-admin environments.
+severity: High
+status: Available
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Execution
+  - DefenseEvasion
+relevantTechniques:
+  - T1059.001
+  - T1027
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where FileName in~ ("powershell.exe","pwsh.exe")
+  | where ProcessCommandLine matches regex @"(?i)\s-(?:enc(?:odedcommand)?|e|ec)\s+[A-Za-z0-9+/=]{250,}"
+  | extend EncodedBlob = extract(@"(?i)\s-(?:enc(?:odedcommand)?|e|ec)\s+([A-Za-z0-9+/=]+)", 1, ProcessCommandLine)
+  | extend DecodedAttempt = iff(strlen(EncodedBlob) < 4000,
+                                base64_decode_tostring(EncodedBlob),
+                                "<too long, decode offline>")
+  | project TimeGenerated, DeviceId, DeviceName, AccountName, FileName, ProcessCommandLine,
+            EncodedBlob, DecodedAttempt, InitiatingProcessFileName,
+            InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+  - entityType: Process
+    fieldMappings:
+      - identifier: CommandLine
+        columnName: ProcessCommandLine
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT12H
+    matchingMethod: Selected
+    groupByEntities:
+      - Host
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: DeviceProcessEvents (Microsoft Defender for Endpoint / M365 advanced hunting). ScriptBlockLogging is not required — the encoded payload is visible in the command line.
+  falsePositives: |
+    - Software installers and RMM agents that launch PowerShell with encoded blobs
+      (check InitiatingProcessFileName during triage).
+    - Admin one-liners shared via chat that use -enc for quoting reasons.
+  tuningGuidance: |
+    - Adjust the 250-char floor: shorter catches more attacker one-liners but the
+      false-positive rate from installers rises quickly below ~120 chars.
+    - Add an InitiatingProcessFileName !in~ allow-list for documented RMM tools
+      rather than suppressing whole devices.
+  suppression: |
+    No static suppression. Tool-specific allow-lists in the query only.
+  expectedVolume: Low in a managed estate; bursts during software rollouts.
+version: 1.1.0

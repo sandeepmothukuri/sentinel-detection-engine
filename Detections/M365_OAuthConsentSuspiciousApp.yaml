@@ -1,0 +1,86 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a07
+name: M365 - Suspicious OAuth Consent to Unverified Publisher
+description: |
+  Detects user-granted OAuth consent to an application that requests high-risk
+  scopes (Mail.Read, Mail.ReadWrite, Files.ReadWrite.All, offline_access, ...).
+  Illicit-consent grant phishing (e.g. PerfectData, eM Client lookalikes) is a
+  dominant BEC vector. AuditLogs does not expose the verified-publisher flag,
+  so triage must confirm publisher status against the app registration.
+severity: High
+status: Available
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+  - Persistence
+  - CredentialAccess
+relevantTechniques:
+  - T1528
+  - T1098.001
+query: |
+  let high_risk_scopes = dynamic([
+    "Mail.Read","Mail.ReadWrite","Mail.Send","MailboxSettings.ReadWrite",
+    "Files.Read.All","Files.ReadWrite.All","Sites.ReadWrite.All",
+    "offline_access","User.Read.All","Directory.Read.All","Contacts.Read"
+  ]);
+  let excluded_apps = dynamic([]);
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName == "Consent to application"
+  | extend Actor = tostring(InitiatedBy.user.userPrincipalName)
+  | extend AppName = tostring(TargetResources[0].displayName)
+  | extend AppId = tostring(TargetResources[0].id)
+  | where AppId !in (excluded_apps)
+  | mv-expand mod = TargetResources[0].modifiedProperties
+  | extend PropName = tostring(mod.displayName), NewValue = tostring(mod.newValue)
+  | where PropName == "ConsentAction.Permissions"
+  | extend Scopes = NewValue
+  | extend IsAdminConsent = NewValue has "AdminConsent=True"
+  | where Scopes has_any (high_risk_scopes)
+  | project TimeGenerated, Actor, AppName, AppId, IsAdminConsent, Scopes
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+  - entityType: CloudApplication
+    fieldMappings:
+      - identifier: AppId
+        columnName: AppId
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT6H
+    matchingMethod: Selected
+    groupByEntities:
+      - Account
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: AuditLogs (Entra ID connector), Operation "Consent to application".
+  falsePositives: |
+    - Sanctioned third-party SaaS (CRM, e-signature, productivity add-ins) that
+      request Mail/Files scopes from a non-verified publisher.
+    - Admin-consented enterprise deployments (IsAdminConsent == true).
+  tuningGuidance: |
+    - Populate excluded_apps with AppIds of sanctioned applications (keep the list
+      under change control).
+    - Enforce an admin-consent workflow in Entra ID; user consent to high-risk
+      scopes should then be blocked, and this rule verifies that control.
+    - Triage step: look up AppId in the tenant (Enterprise Applications) and check
+      the verified-publisher status manually — AuditLogs does not carry it.
+  suppression: |
+    No static suppression. Sanctioned apps belong in excluded_apps.
+  expectedVolume: Low in tenants with the admin-consent workflow enabled.
+version: 1.1.0

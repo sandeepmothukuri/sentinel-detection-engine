@@ -1,0 +1,75 @@
+name: release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install pyyaml
+
+      - name: Validate before releasing
+        run: |
+          python scripts/ci_validate.py
+          python scripts/generate_coverage.py
+          git diff --exit-code coverage.md attack-navigator/layer.json
+
+      - name: Pack rules into release archive
+        run: |
+          mkdir -p dist
+          tar czf dist/sentinel-detection-engine-${GITHUB_REF_NAME}.tar.gz \
+            Detections \
+            'Hunting Queries' \
+            Workbooks \
+            Playbooks \
+            attack-navigator \
+            coverage.md \
+            tests/atomics.md \
+            README.md \
+            LICENSE
+          (cd dist && sha256sum sentinel-detection-engine-${GITHUB_REF_NAME}.tar.gz > sentinel-detection-engine-${GITHUB_REF_NAME}.sha256)
+
+      - name: Generate changelog from commits
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            RANGE=""
+          else
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+          {
+            echo "## Changes since ${PREV_TAG:-the beginning}"
+            echo
+            git log --pretty=format:'- %s (%h)' $RANGE -- Detections "Hunting Queries" Workbooks Playbooks scripts .github/workflows | sed 's/^- //; s/^/- /'
+            echo
+            echo "## Coverage snapshot"
+            python -c "
+            import re, pathlib
+            md = pathlib.Path('coverage.md').read_text()
+            m = re.search(r'- \*\*Rules:.*\n.*\n.*', md)
+            print(m.group(0) if m else 'see coverage.md')
+            "
+          } > CHANGELOG_RELEASE.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: CHANGELOG_RELEASE.md
+          files: |
+            dist/sentinel-detection-engine-*.tar.gz
+            dist/sentinel-detection-engine-*.sha256

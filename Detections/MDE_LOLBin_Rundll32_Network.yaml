@@ -1,0 +1,90 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a08
+name: MDE - rundll32 With External Network Connection
+description: |
+  Detects rundll32.exe processes making outbound network connections to non-RFC1918
+  destinations. Legitimate rundll32 should rarely contact the internet directly;
+  this pattern is a hallmark of CobaltStrike, IcedID, and Qakbot loaders.
+severity: High
+status: Available
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+      - DeviceNetworkEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+  - Execution
+  - CommandAndControl
+relevantTechniques:
+  - T1218.011
+  - T1071.001
+query: |
+  let proc =
+    DeviceProcessEvents
+    | where TimeGenerated > ago(1h)
+    | where FileName =~ "rundll32.exe"
+    | project ProcTime = TimeGenerated, DeviceId, DeviceName, ProcessId,
+              InitiatingProcessFileName, ProcessCommandLine, AccountName;
+  let net =
+    DeviceNetworkEvents
+    | where TimeGenerated > ago(1h)
+    | where InitiatingProcessFileName =~ "rundll32.exe"
+    | where RemoteIPType !in ("Private","Loopback","LinkLocal","Reserved")
+    | where isnotempty(RemoteIP)
+    | project NetTime = TimeGenerated, DeviceId, InitiatingProcessId,
+              RemoteIP, RemotePort, RemoteUrl;
+  proc
+  | join kind=inner net on DeviceId, $left.ProcessId == $right.InitiatingProcessId
+  | where NetTime between (ProcTime .. (ProcTime + 10m))
+  | project ProcTime, NetTime, DeviceId, DeviceName, AccountName, ProcessCommandLine,
+            RemoteIP, RemotePort, RemoteUrl, InitiatingProcessFileName
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: RemoteIP
+  - entityType: Process
+    fieldMappings:
+      - identifier: CommandLine
+        columnName: ProcessCommandLine
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT12H
+    matchingMethod: Selected
+    groupByEntities:
+      - Host
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: DeviceProcessEvents + DeviceNetworkEvents (Microsoft Defender for Endpoint / M365 advanced hunting). Joining on DeviceId + process ID keeps cardinality low; the 10-minute correlation window bounds false pairings.
+  falsePositives: |
+    - Some Windows features and OEM telemetry DLLs invoke rundll32 with outbound
+      calls (e.g. OneSetup, WebAssembly hosting on managed devices).
+    - Proxy-auth or captive-portal checks started via rundll32.
+  tuningGuidance: |
+    - If specific RemoteUrl or RemoteIP patterns are known-benign, add
+      RemoteUrl !endswith / RemoteIP !in allow-lists before the join.
+    - RemotePort is intentionally limited to 80/443/8080/8443/53 — C2 on other
+      ports is rarer for this loader family; widen deliberately and watch volume.
+  suppression: |
+    No static suppression. Use IP/URL indicators for confirmed-benign destinations.
+  expectedVolume: Low; a few incidents per week in a 1k-seat estate, mostly proxy noise.
+version: 1.1.0

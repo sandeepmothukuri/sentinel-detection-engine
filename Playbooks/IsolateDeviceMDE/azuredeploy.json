@@ -1,0 +1,165 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "title": "IsolateDeviceMDE",
+    "description": "On Sentinel incident creation, only for incidents at or above the severity gate, for every Host entity with an MDE machine ID, call Microsoft Defender for Endpoint machineActions API to network-isolate the device and post an audit comment back to Sentinel. Devices without an MDE ID and incidents below the gate get a comment instead of an action.",
+    "prerequisites": "App registration with MDE 'Machine.Isolate' permission, granted admin consent. Connection: 'wdatp' (Microsoft Defender ATP). See README for least-privilege guidance and rollback (unisolation).",
+    "lastUpdateTime": "2026-05-14",
+    "author": { "name": "Sandeep Mothukuri" }
+  },
+  "parameters": {
+    "PlaybookName": { "type": "string", "defaultValue": "IsolateDeviceMDE" },
+    "SentinelConnectionName": { "type": "string", "defaultValue": "azuresentinel" },
+    "MDEConnectionName": { "type": "string", "defaultValue": "wdatp" },
+    "IsolationType": {
+      "type": "string",
+      "defaultValue": "Selective",
+      "allowedValues": ["Full", "Selective"],
+      "metadata": { "description": "Full = total isolation incl. Outlook/Teams. Selective keeps Microsoft comms apps. Selective is the safer default." }
+    },
+    "MinimumSeverity": {
+      "type": "string",
+      "defaultValue": "High",
+      "allowedValues": ["High", "Medium", "Low", "Informational"],
+      "metadata": { "description": "Only incidents with this severity trigger isolation; lower-severity incidents get a comment only." }
+    }
+  },
+  "variables": {
+    "SentConnId": "[resourceId('Microsoft.Web/connections', parameters('SentinelConnectionName'))]",
+    "MDEConnId":  "[resourceId('Microsoft.Web/connections', parameters('MDEConnectionName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[parameters('PlaybookName')]",
+      "location": "[resourceGroup().location]",
+      "tags": { "hidden-SentinelTemplateName": "IsolateDeviceMDE", "hidden-SentinelTemplateVersion": "1.1.0" },
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "$connections": { "defaultValue": {}, "type": "Object" },
+            "IsolationType": { "defaultValue": "[parameters('IsolationType')]", "type": "String" },
+            "MinimumSeverity": { "defaultValue": "[parameters('MinimumSeverity')]", "type": "String" }
+          },
+          "triggers": {
+            "Microsoft_Sentinel_incident": {
+              "type": "ApiConnectionWebhook",
+              "inputs": {
+                "body": { "callback_url": "@listCallbackUrl()" },
+                "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+                "path": "/incident-creation"
+              },
+              "runtimeConfiguration": { "concurrency": { "runs": 1 } }
+            }
+          },
+          "actions": {
+            "Entities_-_Get_Hosts": {
+              "type": "ApiConnection",
+              "inputs": {
+                "body": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+                "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+                "method": "post",
+                "path": "/entities/host"
+              }
+            },
+            "Condition_-_Severity_Gate": {
+              "runAfter": { "Entities_-_Get_Hosts": ["Succeeded"] },
+              "type": "If",
+              "expression": {
+                "and": [
+                  { "equals": ["@triggerBody()?['object']?['properties']?['severity']", "@parameters('MinimumSeverity')"] },
+                  { "greater": ["@length(body('Entities_-_Get_Hosts')?['Hosts'])", 0] }
+                ]
+              },
+              "actions": {
+                "For_each_Host": {
+                  "type": "Foreach",
+                  "foreach": "@body('Entities_-_Get_Hosts')?['Hosts']",
+                  "actions": {
+                    "Check_Has_MDE_ID": {
+                      "type": "If",
+                      "expression": { "and": [{ "not": { "equals": ["@items('For_each_Host')?['MdatpDeviceId']", null] } }] },
+                      "actions": {
+                        "MDE_-_Isolate_Machine": {
+                          "type": "ApiConnection",
+                          "inputs": {
+                            "host": { "connection": { "name": "@parameters('$connections')['wdatp']['connectionId']" } },
+                            "method": "post",
+                            "path": "/api/machines/@{encodeURIComponent(items('For_each_Host')?['MdatpDeviceId'])}/isolate",
+                            "body": {
+                              "Comment": "Auto-isolation triggered by Sentinel incident @{triggerBody()?['object']?['properties']?['incidentNumber']}.",
+                              "IsolationType": "@parameters('IsolationType')"
+                            }
+                          }
+                        },
+                        "Sentinel_Comment_Isolated": {
+                          "runAfter": { "MDE_-_Isolate_Machine": ["Succeeded","Failed"] },
+                          "type": "ApiConnection",
+                          "inputs": {
+                            "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+                            "method": "post",
+                            "path": "/Incidents/Comment",
+                            "body": {
+                              "incidentArmId": "@triggerBody()?['object']?['id']",
+                              "message": "Issued MDE isolate (@{parameters('IsolationType')}) for device @{items('For_each_Host')?['HostName']} (MDE ID @{items('For_each_Host')?['MdatpDeviceId']}). ROLLBACK: release isolation from the MDE machineActions page or 'Invoke-MDmachineaction -ReleaseIsolation'."
+                            }
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Sentinel_Comment_No_MDE_ID": {
+                            "type": "ApiConnection",
+                            "inputs": {
+                              "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+                              "method": "post",
+                              "path": "/Incidents/Comment",
+                              "body": {
+                                "incidentArmId": "@triggerBody()?['object']?['id']",
+                                "message": "Host @{items('For_each_Host')?['HostName']} has no MdatpDeviceId entity value — isolation skipped, manual verification required."
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "runtimeConfiguration": { "concurrency": { "runs": 1 } }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Sentinel_Comment_Below_Gate": {
+                    "type": "ApiConnection",
+                    "inputs": {
+                      "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+                      "method": "post",
+                      "path": "/Incidents/Comment",
+                      "body": {
+                        "incidentArmId": "@triggerBody()?['object']?['id']",
+                        "message": "Isolation playbook evaluated: incident severity below gate (@{parameters('MinimumSeverity')}) or no host entities. No action taken."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "azuresentinel": { "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]", "connectionId": "[variables('SentConnId')]", "connectionName": "azuresentinel" },
+              "wdatp":         { "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/wdatp')]",         "connectionId": "[variables('MDEConnId')]",  "connectionName": "wdatp" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a01
+name: Entra ID - Impossible Travel Between Sign-Ins
+description: |
+  Detects two successful interactive sign-ins for the same user from locations
+  whose great-circle distance cannot be plausibly traversed in the elapsed time
+  (default threshold: > 800 km/h between events). High-confidence indicator of
+  session token theft, AiTM phishing, or shared credentials.
+severity: High
+status: Available
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+queryFrequency: 1h
+queryPeriod: 6h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+  - CredentialAccess
+relevantTechniques:
+  - T1078.004
+  - T1539
+query: |
+  let velocity_kmh_threshold = 800.0;
+  let min_distance_km = 500.0;
+  let max_gap_min = 720;
+  SigninLogs
+  | where TimeGenerated > ago(6h)
+  | where ResultType == 0
+  | extend City = tostring(LocationDetails.city), Country = tostring(LocationDetails.countryOrRegion)
+  | extend Lat = todouble(LocationDetails.geoCoordinates.latitude)
+  | extend Lon = todouble(LocationDetails.geoCoordinates.longitude)
+  | where isnotempty(Lat) and isnotempty(Lon)
+  | sort by UserPrincipalName asc, TimeGenerated asc
+  | extend PrevTime = prev(TimeGenerated), PrevUser = prev(UserPrincipalName)
+  | extend PrevLat = prev(Lat), PrevLon = prev(Lon), PrevCity = prev(City), PrevCountry = prev(Country)
+  | where UserPrincipalName == PrevUser
+  | extend DeltaMin = datetime_diff('minute', TimeGenerated, PrevTime)
+  | where DeltaMin > 0 and DeltaMin < max_gap_min
+  | extend DistanceKm = geo_distance_2points(PrevLon, PrevLat, Lon, Lat) / 1000.0
+  | extend VelocityKmh = DistanceKm / (DeltaMin / 60.0)
+  | where VelocityKmh > velocity_kmh_threshold and DistanceKm > min_distance_km
+  | project TimeGenerated, UserPrincipalName, IPAddress, AppDisplayName,
+            PrevCity, PrevCountry, City, Country, DistanceKm, DeltaMin, VelocityKmh
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: IPAddress
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT6H
+    matchingMethod: AllEntities
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: SigninLogs (Entra ID connector). Requires LocationDetails with geoCoordinates, which the interactive sign-in stream populates for most authentications.
+  falsePositives: |
+    - Corporate VPN / ZTNA egress IPs registered in a different region than the user.
+    - Users who RDP or VDI into a machine that then signs in from a datacenter location.
+    - Frequent travellers with a genuine fast connection (rare above 800 km/h).
+    - Shared / break-glass accounts used from more than one region.
+  tuningGuidance: |
+    - Raise velocity_kmh_threshold (e.g. 900-1000) if corporate VPN exits trigger.
+    - Exclude known VPN egress IPs by adding an IPAddress !in (vpn_egress) filter.
+    - Reduce max_gap_min if you only care about fast pivots (e.g. 240 min).
+    - Track alert volume in docs/metrics.md before and after each change.
+  suppression: |
+    Prefer tuning over suppression. If suppression is required, use IP-based
+    indicators for the specific VPN egress, never suppress the rule globally.
+  expectedVolume: Low. Typically a handful of incidents per week in a 1k-5k seat tenant after VPN tuning.
+version: 1.1.0

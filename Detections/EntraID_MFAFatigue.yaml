@@ -1,0 +1,87 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a02
+name: Entra ID - MFA Fatigue Followed by Success
+description: |
+  Detects 5+ failed MFA prompts followed by a successful sign-in for the same
+  user within 30 minutes. Classic MFA bombing / push-fatigue pattern used to
+  wear down a user until they approve a malicious request.
+severity: High
+status: Available
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+queryFrequency: 30m
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CredentialAccess
+  - InitialAccess
+relevantTechniques:
+  - T1621
+  - T1110.003
+query: |
+  let window = 30m;
+  let failed_mfa_threshold = 5;
+  let failures =
+    SigninLogs
+    | where TimeGenerated > ago(1h)
+    | where ResultType in (50074, 50076, 500121, 530002)
+    | summarize FailedMFA = count(), FirstFail = min(TimeGenerated), LastFail = max(TimeGenerated)
+              by UserPrincipalName, IPAddress
+    | where FailedMFA >= failed_mfa_threshold;
+  let success =
+    SigninLogs
+    | where TimeGenerated > ago(1h)
+    | where ResultType == 0
+    | where AuthenticationRequirement == "multiFactorAuthentication"
+    | project SuccessTime = TimeGenerated, UserPrincipalName, SuccessIP = IPAddress,
+              AppDisplayName, UserAgent;
+  failures
+  | join kind=inner success on UserPrincipalName
+  | where SuccessTime between (LastFail .. (LastFail + window))
+  | where IPAddress == SuccessIP
+  | project FirstFail, LastFail, SuccessTime, UserPrincipalName, IPAddress,
+            SuccessIP, FailedMFA, AppDisplayName, UserAgent
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: SuccessIP
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT1H
+    matchingMethod: AllEntities
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: |
+    SigninLogs (Entra ID connector). Failed MFA ResultTypes covered: 50074
+    (MFA denied), 50076 (MFA required), 500121 (MFA denied in strong auth),
+    530002 (MFA denied, fraud reported).
+  falsePositives: |
+    - Users repeatedly failing MFA themselves then succeeding (forgotten password flow).
+    - New MFA rollout periods with widespread user confusion.
+    - The same-IP join (IPAddress == SuccessIP) filters most shared-NAT noise; remove it
+      (and accept more noise) if attackers rotate between IPs between prompts and success.
+  tuningGuidance: |
+    - Raise failed_mfa_threshold for large tenants during MFA rollouts.
+    - If noisy per-IP (CGNAT), drop the IPAddress == SuccessIP line and rely on the
+      30-minute window instead.
+    - Pair with a Conditional Access number-matching rollout; volume should drop to ~0
+      once number matching is enforced.
+  suppression: |
+    Do not suppress globally. If a corporate MFA testing exercise is scheduled,
+    temporarily disable the rule rather than creating static suppressions.
+  expectedVolume: Very low in tenants with MFA number matching enforced.
+version: 1.1.0

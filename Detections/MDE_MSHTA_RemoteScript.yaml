@@ -1,0 +1,71 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a09
+name: MDE - mshta Executing Remote Script
+description: |
+  Detects mshta.exe invoked with an http(s):// URL, javascript:, or vbscript:
+  prefix. Used by trojanised LNK / ISO / OneNote payloads to fetch and execute
+  remote HTAs without writing to disk.
+severity: High
+status: Available
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+  - Execution
+relevantTechniques:
+  - T1218.005
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where FileName =~ "mshta.exe"
+  | where ProcessCommandLine matches regex @"(?i)(https?://|javascript:|vbscript:|about:)"
+  | extend ParentFile = tostring(InitiatingProcessFileName)
+  | project TimeGenerated, DeviceId, DeviceName, AccountName, ProcessCommandLine,
+            ParentFile, InitiatingProcessCommandLine, FolderPath
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+  - entityType: Process
+    fieldMappings:
+      - identifier: CommandLine
+        columnName: ProcessCommandLine
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT12H
+    matchingMethod: Selected
+    groupByEntities:
+      - Host
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: DeviceProcessEvents (Microsoft Defender for Endpoint / M365 advanced hunting).
+  falsePositives: |
+    - Legacy line-of-business HTA applications launched from file shares
+      (those use file paths, not URLs — filtered out by the scheme match).
+    - Admin tooling that wraps mshta for legit purposes is rare; treat every hit
+      as suspicious until proven otherwise.
+  tuningGuidance: |
+    - If a business unit still relies on remote HTAs, allow-list the specific URLs
+      with a ProcessCommandLine !has filter for the exact host.
+    - Drive the HTA retirement with app-control policy; this rule then verifies it.
+  suppression: |
+    No static suppression. URL-specific allow-lists only.
+  expectedVolume: Very low; should be near zero in a hardened estate.
+version: 1.1.0

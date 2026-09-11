@@ -1,0 +1,4 @@
+# Every change to this repo requires review by @sandeepmothukuri.
+# This file is interpreted by GitHub: PRs auto-request his review and
+# branch protection rules can require CODEOWNERS approval before merge.
+*       @sandeepmothukuri

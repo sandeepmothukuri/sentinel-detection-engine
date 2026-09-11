@@ -1,0 +1,58 @@
+id: 9b1a4e0d-2c3f-4e7b-8d22-8f5e1d3c9b09
+name: HUN - DNS Queries to Free / Dynamic / Tunneling TLDs
+description: |
+  Hypothesis - Free dynamic-DNS providers (duckdns.org, no-ip.com, dynu, dnsexit)
+  and abused new-gTLDs (.xyz, .top, .click, .tk, .gq, .cf, .ml, .icu) are
+  over-represented in commodity-malware C2. Surface every endpoint DNS query
+  matching this list, then triage by parent process.
+hypothesis: |
+  One or more endpoints in the estate are beaconing to C2 hosted on free
+  dynamic-DNS providers or abused cheap gTLDs. If true, the parent process of
+  the DNS query will be a browser (phishing landing) or an unsigned/LOL binary
+  (post-compromise implant).
+requiredTelemetry: |
+  DeviceNetworkEvents via Microsoft Defender for Endpoint. Requires the
+  DnsConnectionInspected / connection ActionTypes, which MDE provides on
+  onboarded machines with the DNS-aware network inspection enabled.
+tactics:
+  - CommandAndControl
+relevantTechniques:
+  - T1071.004
+  - T1568.002
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceNetworkEvents
+query: |
+  let bad_tlds = dynamic([".xyz",".top",".click",".tk",".gq",".cf",".ml",".icu",".rest",".country",".buzz",".cyou"]);
+  let dyn_dns = dynamic(["duckdns.org","no-ip.com","no-ip.org","ddns.net","hopto.org","zapto.org","dynu.net","dnsexit.com","sytes.net","myftp.org","servehttp.com"]);
+  DeviceNetworkEvents
+  | where TimeGenerated > ago(24h)
+  | where ActionType in ("ConnectionSuccess","DnsConnectionInspected","ConnectionAttempt")
+  | where isnotempty(RemoteUrl)
+  | extend host = tolower(tostring(RemoteUrl))
+  | extend Domain = parse_url(host).Host
+  | extend Tld = strcat(".", tostring(split(Domain, ".")[-1]))
+  | where host has_any (dyn_dns) or Tld in (bad_tlds)
+  | project TimeGenerated, DeviceName, AccountName, host, Domain, Tld, RemoteIP,
+            InitiatingProcessFileName, InitiatingProcessCommandLine
+expectedFindings: |
+  - Marketing teams visiting .click/.buzz campaign links (browser parent).
+  - Developers using duckdns-style hosts for home labs (parent = ssh/vpn client).
+  - Zero hits with a non-browser parent process is the healthy state.
+investigationSteps: |
+  1. Group hits by InitiatingProcessFileName; non-browser parents are the
+     interesting ones.
+  2. For each suspicious domain, resolve and check WHOIS/age and reputation.
+  3. Pull the device's process tree for the parent binary; check signature and
+     first-seen (pair with HUN - Rare Process Per Device).
+  4. If implant suspected: isolate the device and capture the binary hash.
+escalation: |
+  Escalate to IR if the parent process is unsigned, lives in %TEMP%, or the
+  domain resolves to a freshly registered IP with no reputation.
+limitations: |
+  TLD matching catches the registrable TLD only; a .com domain fronting a
+  tunnelling provider is invisible to this hunt. parse_url assumes RemoteUrl
+  contains a usable URL/host string — some MDE connection rows carry bare IPs,
+  which are dropped by the isnotempty(RemoteUrl) filter.
+version: 1.1.0

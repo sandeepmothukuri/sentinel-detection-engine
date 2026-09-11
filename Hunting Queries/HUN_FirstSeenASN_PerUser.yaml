@@ -1,0 +1,57 @@
+id: 9b1a4e0d-2c3f-4e7b-8d22-8f5e1d3c9b01
+name: HUN - First-Seen ASN per User (30-day baseline)
+description: |
+  Hypothesis - Account takeover often shows up as a sign-in from an ASN the
+  user has never used before. Surface every successful interactive sign-in in
+  the last 24 h whose ASN does not appear in the prior 30 d for that user.
+hypothesis: |
+  A user account is being accessed from network infrastructure it has never
+  used before (new VPN, VPS-hosted AiTM proxy, attacker's residential proxy
+  exit). If true, the first-seen ASN sign-in will coincide with other anomalies
+  (impossible travel, new device, consent grants).
+requiredTelemetry: |
+  SigninLogs via the Entra ID connector. AutonomousSystemNumber must be
+  populated (it is for interactive sign-ins in most regions).
+tactics:
+  - InitialAccess
+relevantTechniques:
+  - T1078.004
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+query: |
+  let lookback = 30d;
+  let recent = 24h;
+  let baseline =
+    SigninLogs
+    | where TimeGenerated between (ago(lookback) .. ago(recent))
+    | where ResultType == 0
+    | summarize KnownASNs = make_set(AutonomousSystemNumber, 50) by UserPrincipalName;
+  SigninLogs
+  | where TimeGenerated > ago(recent)
+  | where ResultType == 0
+  | extend ASN = AutonomousSystemNumber
+  | join kind=leftouter baseline on UserPrincipalName
+  | where isnotnull(ASN) and not(set_has_element(KnownASNs, ASN))
+  | project TimeGenerated, UserPrincipalName, IPAddress, ASN, Location,
+            AppDisplayName, UserAgent
+expectedFindings: |
+  - Travellers, new home ISPs, and mobile-carrier CGNAT churn — the bulk of rows.
+  - New corporate VPN egress ASNs after a network change.
+  - Hosting-provider ASNs paired with unfamiliar user agents are the signal.
+investigationSteps: |
+  1. Sort by ASN: cluster users per new ASN; one ASN + many users = infrastructure
+     change; one user + hosting ASN = suspect.
+  2. Check MFA method used, device compliance, and CA policy evaluation for the sign-in.
+  3. Correlate with M365 activity: mailbox rules, consent grants, file downloads
+     in the following hours.
+  4. For high-value accounts, proactively revoke refresh tokens if unexplained.
+escalation: |
+  Escalate when the target is a privileged or executive account, or when the
+  same new ASN appears across multiple high-value users within 24h.
+limitations: |
+  make_set caps at 50 ASNs per user; heavy travellers may false-positive once
+  the cap is hit. Newly hired users and BYOD churn generate baseline noise for
+  their first 30 days.
+version: 1.1.0

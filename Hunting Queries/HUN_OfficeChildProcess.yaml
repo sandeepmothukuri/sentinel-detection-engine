@@ -1,0 +1,54 @@
+id: 9b1a4e0d-2c3f-4e7b-8d22-8f5e1d3c9b06
+name: HUN - Office Apps Spawning Script Interpreters
+description: |
+  Hypothesis - Macro / template-injection / DLL-hijack payloads cause winword,
+  excel, powerpnt, outlook, msaccess, mspub, visio, onenote to spawn cmd,
+  powershell, wscript, cscript, mshta, rundll32, regsvr32, bitsadmin, certutil.
+hypothesis: |
+  A malicious document (macro, OneNote payload, template injection) delivered
+  via email or web download is executing on endpoints. If true, an Office
+  application will appear as the parent of a script interpreter or LOLBin
+  within minutes of file download/open.
+requiredTelemetry: |
+  DeviceProcessEvents via Microsoft Defender for Endpoint with parent-child
+  process lineage (default for MDE).
+tactics:
+  - Execution
+  - InitialAccess
+relevantTechniques:
+  - T1566.001
+  - T1059
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+query: |
+  let office_parents = dynamic(["winword.exe","excel.exe","powerpnt.exe","outlook.exe","msaccess.exe","mspub.exe","visio.exe","onenote.exe","onenotem.exe"]);
+  let suspicious_children = dynamic(["cmd.exe","powershell.exe","pwsh.exe","wscript.exe","cscript.exe","mshta.exe","rundll32.exe","regsvr32.exe","bitsadmin.exe","certutil.exe","installutil.exe","msbuild.exe","hh.exe"]);
+  DeviceProcessEvents
+  | where TimeGenerated > ago(24h)
+  | where InitiatingProcessFileName in~ (office_parents)
+  | where FileName in~ (suspicious_children)
+  | project TimeGenerated, DeviceName, AccountName, InitiatingProcessFileName,
+            InitiatingProcessCommandLine, FileName, ProcessCommandLine
+expectedFindings: |
+  - Most rows are malicious or highly suspicious — Office should not spawn
+    script interpreters in a normal estate.
+  - Occasional false positives: PDF-to-Office add-ins, corporate macro-enabled
+    tools that legitimately shell out (rare, must be documented).
+investigationSteps: |
+  1. Decode the child command line; extract URLs, IPs, and dropped-file paths.
+  2. Pull the document path from the parent command line; retrieve the file
+     from mail (pair with EmailEvents) or download location.
+  3. Check the device for post-exploitation: scheduled tasks, new local admins,
+     LSASS access.
+  4. If confirmed: isolate device, block the document hash, sweep estate-wide
+     for the same parent-child pair.
+escalation: |
+  Any hit where the child is certutil/bitsadmin (download staging) or the
+  document came from an external sender is an automatic IR escalation.
+limitations: |
+  Won't catch payloads that inject directly into the Office process without
+  spawning a child. Office spawned children are also invisible on non-MDE
+  endpoints. 24h window suits interactive hunting cadence.
+version: 1.1.0

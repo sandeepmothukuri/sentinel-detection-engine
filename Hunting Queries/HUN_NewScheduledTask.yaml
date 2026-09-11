@@ -1,0 +1,52 @@
+id: 9b1a4e0d-2c3f-4e7b-8d22-8f5e1d3c9b07
+name: HUN - New Scheduled Task With Script Action
+description: |
+  Hypothesis - schtasks.exe / Register-ScheduledTask creating a task that runs
+  a script interpreter, encoded payload, or LOLBin is a top persistence TTP
+  across ransomware affiliates.
+hypothesis: |
+  An implant has registered a scheduled task for persistence; the task action
+  invokes a script interpreter or LOLBin (directly or via encoded payloads).
+  If true, the creating process chain will show a user-mode exploit, macro, or
+  installer as the grandparent process.
+requiredTelemetry: |
+  DeviceProcessEvents via Microsoft Defender for Endpoint (process command
+  lines, which require command-line capture enabled on onboarded devices —
+  on by default for MDE).
+tactics:
+  - Persistence
+  - PrivilegeEscalation
+relevantTechniques:
+  - T1053.005
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(24h)
+  | where FileName in~ ("schtasks.exe","powershell.exe","pwsh.exe")
+  | where ProcessCommandLine matches regex @"(?i)(schtasks.*\/create|Register-ScheduledTask|New-ScheduledTaskAction)"
+  | where ProcessCommandLine has_any ("powershell","cmd.exe","wscript","cscript","mshta","rundll32","regsvr32","-enc","FromBase64String","http://","https://")
+  | project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine,
+            InitiatingProcessFileName, InitiatingProcessCommandLine
+expectedFindings: |
+  - Software-update and monitoring agents re-registering tasks (documented).
+  - SCCM/Intune-generated maintenance tasks.
+  - Unknown tasks created by wscript/cscript or spawning from %TEMP% are the
+    signal; cross-check with HUN - Unsigned Binary Execution From Temp/AppData.
+investigationSteps: |
+  1. Decode any encoded action; resolve the task binary and hash.
+  2. Review the creating process chain and the user context (SYSTEM vs user).
+  3. Check MDE for detections on the same device in the same window.
+  4. If implant confirmed: delete the task, isolate, hunt the hash estate-wide.
+escalation: |
+  Escalate when the task runs at logon/boot from user-writable paths, or the
+  creating process is an Office child (pair with HUN - Office Apps Spawning
+  Script Interpreters).
+limitations: |
+  Only sees task creation via command line; tasks registered directly through
+  the Task Scheduler COM API by a trusted-looking parent will still appear,
+  but tasks created on non-MDE devices are invisible. 24h window = manual hunt
+  cadence, not continuous coverage.
+version: 1.1.0

@@ -1,0 +1,82 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a06
+name: M365 - Mass SharePoint / OneDrive Download
+description: |
+  Detects users downloading > 200 files within 1 hour from SharePoint or OneDrive,
+  with comparison to the user's 30-day baseline (mean + 3*stdev). Catches insider
+  data theft and post-compromise smash-and-grab exfiltration.
+severity: Medium
+status: Available
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 30d
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Collection
+  - Exfiltration
+relevantTechniques:
+  - T1213.002
+  - T1567.002
+query: |
+  let abs_threshold = 200;
+  let excluded_users = dynamic([]);
+  let baseline =
+    OfficeActivity
+    | where TimeGenerated between (ago(30d) .. ago(1h))
+    | where Operation in ("FileDownloaded","FileSyncDownloadedFull")
+    | summarize HourlyCount = count() by UserId, bin(TimeGenerated, 1h)
+    | summarize MeanHourly = avg(HourlyCount), StdevHourly = stdev(HourlyCount) by UserId;
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where Operation in ("FileDownloaded","FileSyncDownloadedFull")
+  | where UserId !in (excluded_users)
+  | summarize Downloads = count(), LastDownload = max(TimeGenerated),
+              Files = make_set(OfficeObjectId, 50), IPs = make_set(ClientIP, 10)
+            by UserId
+  | where Downloads >= abs_threshold
+  | join kind=leftouter baseline on UserId
+  | extend AnomalyScore = iff(StdevHourly > 0, (todouble(Downloads) - MeanHourly) / StdevHourly, 99.0)
+  | where AnomalyScore > 3.0 or isnull(MeanHourly)
+  | project LastDownload, UserId, Downloads, MeanHourly, StdevHourly,
+            AnomalyScore, IPs, Files
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserId
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT12H
+    matchingMethod: Selected
+    groupByEntities:
+      - Account
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: OfficeActivity (Office 365 connector, SharePoint workload). queryPeriod is 30d because the baseline needs the full lookback; this makes the rule one of the more expensive ones in the pack (see docs/metrics.md).
+  falsePositives: |
+    - OneDrive sync clients performing initial sync or large re-syncs
+      (FileSyncDownloadedFull is emitted per file).
+    - Data migrations, eDiscovery exports, and users legitimately copying a
+      project folder.
+    - New users with no baseline will trigger on any >= 200 file hour
+      (isnull(MeanHourly) branch) — expected behaviour, documented.
+  tuningGuidance: |
+    - Populate excluded_users with migration/sync service accounts.
+    - Raise abs_threshold if the tenant is document-heavy (e.g. 500 for
+      engineering orgs) and let the z-score do the rest.
+    - If cost matters, reduce queryPeriod to 14d — baseline precision drops
+      slightly but query cost halves.
+  suppression: |
+    No static suppression. Service accounts are handled by excluded_users.
+  expectedVolume: Low after service-account exclusion; z-score branch keeps most noise down.
+version: 1.1.0

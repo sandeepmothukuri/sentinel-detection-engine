@@ -1,0 +1,140 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# L3 Triage Dashboard\nIncident KPIs, severity distribution, top detections, ATT&CK coverage, tuning indicators, and active incidents.\n\n*Author: Sandeep Mothukuri — part of [sentinel-detection-engine](https://github.com/sandeepmothukuri/sentinel-detection-engine)*"
+      },
+      "name": "Header"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "timerange",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "type": 4,
+            "value": { "durationMs": 86400000 },
+            "typeSettings": {
+              "selectableValues": [
+                { "durationMs": 3600000 },
+                { "durationMs": 14400000 },
+                { "durationMs": 86400000 },
+                { "durationMs": 604800000 },
+                { "durationMs": 2592000000 }
+              ]
+            }
+          }
+        ],
+        "style": "pills",
+        "queryType": 0
+      },
+      "name": "Parameters"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let created = SecurityIncident | where TimeGenerated {TimeRange} | summarize Created = dcount(IncidentNumber);\nlet open = SecurityIncident | where TimeGenerated {TimeRange} | summarize arg_max(TimeGenerated, *) by IncidentNumber | where Status =~ \"New\" or Status =~ \"Active\" | count | project Open = Count;\nlet closed = SecurityIncident | where TimeGenerated {TimeRange} | summarize arg_max(TimeGenerated, *) by IncidentNumber | where Status =~ \"Closed\" | count | project Closed = Count;\ncreated | extend dummy = 1 | join kind=inner (open | extend dummy = 1) on dummy | join kind=inner (closed | extend dummy = 1) on dummy | project Created, Open, Closed",
+        "size": 0,
+        "title": "Incident KPIs",
+        "visualization": "table"
+      },
+      "name": "IncidentKPIs"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecurityIncident\n| where TimeGenerated {TimeRange}\n| summarize Incidents = dcount(IncidentNumber) by Severity\n| order by Severity asc",
+        "size": 3,
+        "title": "Incidents by severity",
+        "visualization": "piechart"
+      },
+      "name": "IncidentsBySeverity"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecurityAlert\n| where TimeGenerated {TimeRange}\n| summarize Alerts = count() by AlertName\n| top 10 by Alerts desc",
+        "size": 0,
+        "title": "Top 10 firing detections",
+        "visualization": "barchart"
+      },
+      "name": "TopDetections"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecurityAlert\n| where TimeGenerated {TimeRange}\n| summarize Alerts = count() by AlertName, bin(TimeGenerated, 1d)\n| render columnchart with (title=\"Alert volume per day (top 10 rules)\")",
+        "size": 0,
+        "title": "Detection trend (daily)",
+        "visualization": "linechart"
+      },
+      "name": "DetectionTrend"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecurityAlert\n| where TimeGenerated {TimeRange}\n| mv-expand t = todynamic(Tactics)\n| summarize Alerts = count() by Tactic = tostring(t)\n| order by Alerts desc",
+        "size": 0,
+        "title": "Alerts per MITRE ATT&CK tactic",
+        "visualization": "barchart"
+      },
+      "name": "TacticHeatmap"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecurityAlert\n| where TimeGenerated {TimeRange}\n| extend Entities = parse_json(Entities)\n| mv-expand e = Entities\n| extend Type = tostring(e.Type), Value = coalesce(tostring(e.Name), tostring(e.Address), tostring(e.HostName))\n| where isnotempty(Value)\n| summarize Hits = count() by Type, Value\n| top 20 by Hits desc",
+        "size": 0,
+        "title": "Top entities (accounts, hosts, IPs)",
+        "visualization": "table"
+      },
+      "name": "TopEntities"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecurityIncident\n| where TimeGenerated {TimeRange}\n| extend MTTA_min = datetime_diff('minute', FirstActivityTime, CreatedTime)\n| extend MTTR_min = datetime_diff('minute', ClosedTime, CreatedTime)\n| summarize MTTA = avg(MTTA_min), MTTR = avg(MTTR_min) by Severity",
+        "size": 0,
+        "title": "MTTA / MTTR by severity (minutes)",
+        "visualization": "table"
+      },
+      "name": "MTTA_MTTR"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecurityIncident\n| where TimeGenerated {TimeRange}\n| where Status =~ \"Closed\"\n| summarize Total = count(), ClosedAsFalsePositive = countif(CloseReason =~ \"FalsePositive\"), ClosedAsTruePositive = countif(CloseReason =~ \"TruePositive\"), ClosedAsSuspicious = countif(CloseReason =~ \"SuspiciousActivity\"), ClosedUndetermined = countif(CloseReason =~ \"Undetermined\") by Title\n| extend FalsePositiveRate = round(100.0 * ClosedAsFalsePositive / Total, 1)\n| where Total >= 5\n| top 10 by FalsePositiveRate desc",
+        "size": 0,
+        "title": "Tuning indicators — rules with the highest benign-positive closure rate (≥ 5 closed incidents)",
+        "visualization": "table"
+      },
+      "name": "TuningIndicators"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecurityIncident\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by IncidentNumber\n| where Status =~ \"New\" or Status =~ \"Active\"\n| project IncidentNumber, Title, Severity, Status, Owner=Owner.principalName, CreatedTime\n| order by CreatedTime desc",
+        "size": 0,
+        "title": "Open incidents (latest state)",
+        "visualization": "table"
+      },
+      "name": "OpenIncidents"
+    }
+  ],
+  "fallbackResourceIds": [],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}

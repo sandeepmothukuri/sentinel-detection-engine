@@ -1,0 +1,44 @@
+name: detection-pr-report
+
+on:
+  pull_request:
+    paths:
+      - "Detections/**"
+      - "Hunting Queries/**"
+      - "tests/atomics.md"
+      - "coverage.md"
+      - "attack-navigator/layer.json"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - name: Generate detection diff report
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python scripts/pr_diff_report.py > report.md
+          echo "" >> report.md
+          echo "## Test-coverage changes" >> report.md
+          if git diff --quiet ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} -- tests/atomics.md; then
+            echo "- No validation-ledger changes." >> report.md
+          else
+            echo "- \`tests/atomics.md\` changed — verify validation-status moves are evidence-backed." >> report.md
+          fi
+      - name: Post / update PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: detection-diff
+          path: report.md

@@ -1,0 +1,60 @@
+id: 9b1a4e0d-2c3f-4e7b-8d22-8f5e1d3c9b08
+name: HUN - Guest User Added To Privileged Role / Group
+description: |
+  Hypothesis - Cross-tenant attacks (post-Storm-0558, Midnight Blizzard) often
+  pivot via guest invitations. Surface every guest (UPN contains #EXT#) added
+  to a privileged role, group, or owners list in the last 14 days.
+hypothesis: |
+  An attacker with directory-write privileges has invited an external guest or
+  elevated an existing one into a privileged role/group, establishing
+  cross-tenant persistence. If true, the guest's #EXT# UPN will appear in role
+  membership audit events alongside a human or app actor.
+requiredTelemetry: |
+  AuditLogs via the Entra ID connector. Role assignment events must be in scope
+  of the tenant's audit logging (default).
+tactics:
+  - PrivilegeEscalation
+  - Persistence
+relevantTechniques:
+  - T1098.003
+  - T1136.003
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+query: |
+  let privileged = dynamic(["Global Administrator","Privileged Role Administrator","Application Administrator","Cloud Application Administrator","Exchange Administrator","SharePoint Administrator","Security Administrator","User Administrator","Helpdesk Administrator","Conditional Access Administrator"]);
+  AuditLogs
+  | where TimeGenerated > ago(14d)
+  | where OperationName in ("Add member to role","Add owner to group","Add member to group")
+  | mv-expand t = TargetResources
+  | extend TargetUPN = tostring(t.userPrincipalName)
+  | extend TargetType = tostring(t.type)
+  | extend ModProps = t.modifiedProperties
+  | mv-expand mp = ModProps
+  | extend Prop = tostring(mp.displayName), NewValue = tostring(mp.newValue)
+  | extend RoleName = iff(Prop == "Role.DisplayName", replace_regex(NewValue, @"^\[\""|\""\]$", ""), "")
+  | where TargetUPN has "#EXT#"
+       or (Prop == "Role.DisplayName" and NewValue has_any (privileged))
+  | extend Actor = tostring(InitiatedBy.user.userPrincipalName)
+  | project TimeGenerated, Actor, OperationName, TargetUPN, RoleName
+expectedFindings: |
+  - Documented contractor/vendor guests added to non-privileged groups (noise).
+  - Privileged-role grants to internal users appear here too — verify against
+    the PIM/elevation request.
+  - Any #EXT# guest in a privileged role is a finding until proven intentional.
+investigationSteps: |
+  1. Resolve the guest's home tenant and sponsor.
+  2. Confirm who/what approved the elevation (Actor column + change records).
+  3. Review the guest's sign-in and activity footprint since grant time.
+  4. If unexplained: remove the role assignment, disable the guest, and review
+     every other guest privilege grant by the same actor.
+escalation: |
+  Treat any unexplained privileged guest as a P1 — this pattern is the
+  documented Midnight Blizzard persistence technique.
+limitations: |
+  The query only sees events from the last 14 days and the audit retention of
+  the workspace; guest privilege granted earlier than that will not surface.
+  Group membership grants to guests via group-based PIM are only visible when
+  the "Add member to group" event fires.
+version: 1.1.0

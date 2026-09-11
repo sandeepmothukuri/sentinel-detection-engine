@@ -1,0 +1,143 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "title": "CreateServiceNowTicket",
+    "description": "On Sentinel incident creation, opens a ServiceNow INC ticket assigned to the SecOps assignment group with severity-mapped impact and urgency. Posts the ticket number back as a Sentinel incident comment, and stamps the incident with the ticket URL via a tag.",
+    "prerequisites": "ServiceNow connection 'service-now' authorised against the target instance. Assignment group sys_id known.",
+    "lastUpdateTime": "2026-05-14",
+    "author": { "name": "Sandeep Mothukuri" }
+  },
+  "parameters": {
+    "PlaybookName": { "type": "string", "defaultValue": "CreateServiceNowTicket" },
+    "SentinelConnectionName": { "type": "string", "defaultValue": "azuresentinel" },
+    "ServiceNowConnectionName": { "type": "string", "defaultValue": "service-now" },
+    "AssignmentGroupSysId": {
+      "type": "string",
+      "metadata": { "description": "sys_id of the ServiceNow assignment group that owns SecOps tickets." }
+    },
+    "ServiceNowInstanceUrl": {
+      "type": "string",
+      "metadata": { "description": "Base URL of your ServiceNow instance, e.g. https://acme.service-now.com" }
+    }
+  },
+  "variables": {
+    "SentConnId": "[resourceId('Microsoft.Web/connections', parameters('SentinelConnectionName'))]",
+    "SnowConnId": "[resourceId('Microsoft.Web/connections', parameters('ServiceNowConnectionName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[parameters('PlaybookName')]",
+      "location": "[resourceGroup().location]",
+      "tags": { "hidden-SentinelTemplateName": "CreateServiceNowTicket", "hidden-SentinelTemplateVersion": "1.0.0" },
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "$connections": { "defaultValue": {}, "type": "Object" },
+            "AssignmentGroupSysId": { "defaultValue": "[parameters('AssignmentGroupSysId')]", "type": "String" },
+            "ServiceNowInstanceUrl": { "defaultValue": "[parameters('ServiceNowInstanceUrl')]", "type": "String" }
+          },
+          "triggers": {
+            "Microsoft_Sentinel_incident": {
+              "type": "ApiConnectionWebhook",
+              "inputs": {
+                "body": { "callback_url": "@listCallbackUrl()" },
+                "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+                "path": "/incident-creation"
+              },
+              "runtimeConfiguration": { "concurrency": { "runs": 1 } }
+            }
+          },
+          "actions": {
+            "Compose_Severity_Mapping": {
+              "type": "Compose",
+              "inputs": {
+                "Critical": { "impact": 1, "urgency": 1, "priority": 1 },
+                "High":     { "impact": 2, "urgency": 1, "priority": 2 },
+                "Medium":   { "impact": 2, "urgency": 2, "priority": 3 },
+                "Low":      { "impact": 3, "urgency": 3, "priority": 4 },
+                "Informational": { "impact": 3, "urgency": 4, "priority": 5 }
+              }
+            },
+            "Compose_Picked_Mapping": {
+              "runAfter": { "Compose_Severity_Mapping": ["Succeeded"] },
+              "type": "Compose",
+              "inputs": "@coalesce(outputs('Compose_Severity_Mapping')[triggerBody()?['object']?['properties']?['severity']], outputs('Compose_Severity_Mapping')['Medium'])"
+            },
+            "ServiceNow_-_Create_Incident": {
+              "runAfter": { "Compose_Picked_Mapping": ["Succeeded"] },
+              "type": "ApiConnection",
+              "inputs": {
+                "host": { "connection": { "name": "@parameters('$connections')['service-now']['connectionId']" } },
+                "method": "post",
+                "path": "/api/now/table/incident",
+                "body": {
+                  "short_description": "@{triggerBody()?['object']?['properties']?['title']}",
+                  "description": "Sentinel incident @{triggerBody()?['object']?['properties']?['incidentNumber']}\n\nSeverity: @{triggerBody()?['object']?['properties']?['severity']}\nDescription:\n@{triggerBody()?['object']?['properties']?['description']}\n\nSentinel URL: @{triggerBody()?['object']?['properties']?['incidentUrl']}",
+                  "impact":   "@{outputs('Compose_Picked_Mapping')?['impact']}",
+                  "urgency":  "@{outputs('Compose_Picked_Mapping')?['urgency']}",
+                  "priority": "@{outputs('Compose_Picked_Mapping')?['priority']}",
+                  "assignment_group": "@parameters('AssignmentGroupSysId')",
+                  "category": "Security",
+                  "subcategory": "Detection"
+                }
+              }
+            },
+            "Sentinel_Comment_TicketCreationFailed": {
+              "runAfter": { "ServiceNow_-_Create_Incident": ["Failed","TimedOut"] },
+              "type": "ApiConnection",
+              "inputs": {
+                "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+                "method": "post",
+                "path": "/Incidents/Comment",
+                "body": {
+                  "incidentArmId": "@triggerBody()?['object']?['id']",
+                  "message": "WARNING: ServiceNow ticket creation failed. Manual ticket required for Sentinel incident @{triggerBody()?['object']?['properties']?['incidentNumber']}."
+                }
+              }
+            },
+            "Sentinel_Comment_TicketCreated": {
+              "runAfter": { "ServiceNow_-_Create_Incident": ["Succeeded"] },
+              "type": "ApiConnection",
+              "inputs": {
+                "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+                "method": "post",
+                "path": "/Incidents/Comment",
+                "body": {
+                  "incidentArmId": "@triggerBody()?['object']?['id']",
+                  "message": "Opened ServiceNow ticket @{body('ServiceNow_-_Create_Incident')?['result']?['number']}: @{parameters('ServiceNowInstanceUrl')}/nav_to.do?uri=incident.do?sys_id=@{body('ServiceNow_-_Create_Incident')?['result']?['sys_id']}"
+                }
+              }
+            },
+            "Sentinel_AddTag": {
+              "runAfter": { "Sentinel_Comment_TicketCreated": ["Succeeded"] },
+              "type": "ApiConnection",
+              "inputs": {
+                "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+                "method": "put",
+                "path": "/Incidents/Tags",
+                "body": {
+                  "incidentArmId": "@triggerBody()?['object']?['id']",
+                  "tags": ["snow:@{body('ServiceNow_-_Create_Incident')?['result']?['number']}"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "azuresentinel": { "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]", "connectionId": "[variables('SentConnId')]", "connectionName": "azuresentinel" },
+              "service-now":   { "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/service-now')]",   "connectionId": "[variables('SnowConnId')]", "connectionName": "service-now" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validators
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml yamllint pytest
+
+      - name: Secrets scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
+
+      - name: yamllint
+        run: yamllint Detections "Hunting Queries" Playbooks .github/workflows
+
+      - name: Rule validation (schema, ATT&CK, telemetry, metadata, KQL lint)
+        run: python scripts/ci_validate.py
+
+      - name: Python test suite
+        run: python -m pytest tests -v
+
+      - name: Markdown link check
+        run: python scripts/check_links.py
+
+      - name: Regenerate coverage and fail if drift
+        run: |
+          python scripts/generate_coverage.py
+          git diff --exit-code coverage.md attack-navigator/layer.json \
+            || (echo "::error::coverage.md or attack-navigator/layer.json is stale. Run scripts/generate_coverage.py and commit." && exit 1)
+
+      - name: Package rules for GitOps import
+        run: python scripts/package_rules.py
+
+      - name: Upload packaged rules
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-yaml
+          path: dist/sentinel-yaml

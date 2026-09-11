@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>L3 Triage Dashboard — preview mockup</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #0b0f17;
+    --panel: #131a26;
+    --panel-2: #1a2334;
+    --line: #2a3447;
+    --fg: #e6edf7;
+    --muted: #8a95ab;
+    --accent: #4ea1ff;
+    --high: #ff5a72;
+    --med: #ffb454;
+    --low: #4ea1ff;
+    --info: #6dd3a8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  .preview-banner {
+    background: #5b3a08; color: #ffd58a; padding: 8px 16px;
+    font-size: 13px; border-bottom: 1px solid #7a5215;
+  }
+  header {
+    padding: 18px 24px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 16px;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header .meta { color: var(--muted); font-size: 12px; }
+  .filters { padding: 12px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; }
+  .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; color: var(--fg); font-size: 12px; }
+  .pill .k { color: var(--muted); margin-right: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; padding: 16px 24px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+  .card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--fg); display: flex; justify-content: space-between; align-items: center; }
+  .card h3 small { color: var(--muted); font-weight: 400; font-size: 11px; }
+  .span-4 { grid-column: span 4; }
+  .span-6 { grid-column: span 6; }
+  .span-8 { grid-column: span 8; }
+  .span-12 { grid-column: span 12; }
+  .kpis { display: flex; gap: 18px; }
+  .kpi { flex: 1; }
+  .kpi .v { font-size: 26px; font-weight: 600; }
+  .kpi .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .kpi.high .v { color: var(--high); }
+  .kpi.med  .v { color: var(--med);  }
+  .kpi.low  .v { color: var(--low);  }
+  .kpi.info .v { color: var(--info); }
+  .bar { display: grid; grid-template-columns: 220px 1fr 50px; gap: 10px; align-items: center; padding: 4px 0; font-size: 13px; }
+  .bar .name { color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar .track { background: var(--panel-2); height: 10px; border-radius: 999px; overflow: hidden; }
+  .bar .fill { background: linear-gradient(90deg, #4ea1ff, #2776d6); height: 100%; }
+  .bar .n { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .donut-wrap { display: flex; align-items: center; gap: 16px; }
+  .legend { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+  .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .sev { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; }
+  .sev.high { background: rgba(255,90,114,.15); color: var(--high); border: 1px solid rgba(255,90,114,.35); }
+  .sev.med  { background: rgba(255,180,84,.15); color: var(--med);  border: 1px solid rgba(255,180,84,.35); }
+  .sev.low  { background: rgba(78,161,255,.15); color: var(--low);  border: 1px solid rgba(78,161,255,.35); }
+  .heat { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
+  .cell { aspect-ratio: 1.6; border-radius: 3px; background: var(--panel-2); display: flex; align-items: end; justify-content: start; padding: 4px 5px; font-size: 9.5px; color: var(--muted); }
+  .cell.l1 { background: #14304b; color: #c8dcef; }
+  .cell.l2 { background: #1d4f7a; color: #def0ff; }
+  .cell.l3 { background: #2776d6; color: #ffffff; }
+  .cell.l4 { background: #ff5a72; color: #ffffff; }
+  footer { color: var(--muted); padding: 18px 24px 32px; font-size: 11.5px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<div class="preview-banner">
+  <strong>Preview mockup</strong> — this is a static HTML render of the
+  <code>L3-Triage-Dashboard.json</code> workbook in this repo, intended as a
+  visual reference. Deploy the JSON to Microsoft Sentinel for live data.
+</div>
+
+<header>
+  <h1>L3 Triage Dashboard</h1>
+  <span class="meta">sentinel-detection-engine · Sandeep Mothukuri</span>
+</header>
+
+<div class="filters">
+  <span class="pill"><span class="k">Time range</span>Last 24 hours</span>
+  <span class="pill"><span class="k">Workspace</span>sentinel-prod</span>
+  <span class="pill"><span class="k">Sources</span>Entra ID · M365 · MDE · AzureActivity · KeyVault</span>
+</div>
+
+<div class="grid">
+
+  <div class="card span-12">
+    <div class="kpis">
+      <div class="kpi high"><div class="v">7</div><div class="l">High incidents</div></div>
+      <div class="kpi med"> <div class="v">14</div><div class="l">Medium incidents</div></div>
+      <div class="kpi low"> <div class="v">23</div><div class="l">Low / Info</div></div>
+      <div class="kpi info"><div class="v">9 min</div><div class="l">Mean MTTA</div></div>
+      <div class="kpi info"><div class="v">42 min</div><div class="l">Mean MTTR</div></div>
+      <div class="kpi info"><div class="v">18</div><div class="l">ATT&amp;CK techniques covered</div></div>
+    </div>
+  </div>
+
+  <div class="card span-4">
+    <h3>Incidents by severity <small>last 24h</small></h3>
+    <div class="donut-wrap">
+      <svg width="120" height="120" viewBox="0 0 42 42">
+        <circle cx="21" cy="21" r="15.915" fill="none" stroke="#1a2334" stroke-width="6"></circle>
+        <circle cx="21" cy="21" r="15.915" fill="none" stroke="#ff5a72" stroke-width="6" stroke-dasharray="16 84" stroke-dashoffset="25" transform="rotate(-90 21 21)"></circle>
+        <circle cx="21" cy="21" r="15.915" fill="none" stroke="#ffb454" stroke-width="6" stroke-dasharray="32 68" stroke-dashoffset="9" transform="rotate(-90 21 21)"></circle>
+        <circle cx="21" cy="21" r="15.915" fill="none" stroke="#4ea1ff" stroke-width="6" stroke-dasharray="52 48" stroke-dashoffset="-23" transform="rotate(-90 21 21)"></circle>
+      </svg>
+      <div class="legend">
+        <div><span class="dot" style="background:#ff5a72"></span>High · 7</div>
+        <div><span class="dot" style="background:#ffb454"></span>Medium · 14</div>
+        <div><span class="dot" style="background:#4ea1ff"></span>Low / Info · 23</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card span-8">
+    <h3>Top firing detections <small>by alert volume, 24h</small></h3>
+    <div class="bar"><span class="name">M365 — Inbox Rule Exfil</span><span class="track"><span class="fill" style="width:96%"></span></span><span class="n">24</span></div>
+    <div class="bar"><span class="name">Entra ID — MFA Fatigue Followed by Success</span><span class="track"><span class="fill" style="width:74%"></span></span><span class="n">19</span></div>
+    <div class="bar"><span class="name">MDE — PowerShell EncodedCommand</span><span class="track"><span class="fill" style="width:66%"></span></span><span class="n">17</span></div>
+    <div class="bar"><span class="name">Entra ID — Impossible Travel</span><span class="track"><span class="fill" style="width:51%"></span></span><span class="n">13</span></div>
+    <div class="bar"><span class="name">MDE — rundll32 With External Network</span><span class="track"><span class="fill" style="width:43%"></span></span><span class="n">11</span></div>
+    <div class="bar"><span class="name">Azure — NSG Rule Opens Port to 0.0.0.0/0</span><span class="track"><span class="fill" style="width:35%"></span></span><span class="n">9</span></div>
+    <div class="bar"><span class="name">M365 — Mass SharePoint Download</span><span class="track"><span class="fill" style="width:31%"></span></span><span class="n">8</span></div>
+    <div class="bar"><span class="name">Entra ID — Legacy Auth Success</span><span class="track"><span class="fill" style="width:23%"></span></span><span class="n">6</span></div>
+    <div class="bar"><span class="name">M365 — OAuth Consent (Unverified)</span><span class="track"><span class="fill" style="width:19%"></span></span><span class="n">5</span></div>
+    <div class="bar"><span class="name">Azure — Key Vault Secret Access Spike</span><span class="track"><span class="fill" style="width:15%"></span></span><span class="n">4</span></div>
+  </div>
+
+  <div class="card span-6">
+    <h3>ATT&amp;CK coverage heatmap <small>tactic × technique density</small></h3>
+    <div class="heat">
+      <div class="cell l1">Recon</div>
+      <div class="cell l1">Res. Dev</div>
+      <div class="cell l4">Init. Access</div>
+      <div class="cell l3">Execution</div>
+      <div class="cell l3">Persistence</div>
+      <div class="cell l2">Priv. Esc.</div>
+      <div class="cell l3">Defense Ev.</div>
+      <div class="cell l3">Cred. Acc.</div>
+      <div class="cell l2">Discovery</div>
+      <div class="cell l2">Lat. Move</div>
+      <div class="cell l3">Collection</div>
+      <div class="cell l4">Exfil / C2</div>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--muted);">Darker = higher rule density. 18 techniques across 10 tactics.</div>
+  </div>
+
+  <div class="card span-6">
+    <h3>Top entities <small>accounts, hosts, IPs</small></h3>
+    <table>
+      <thead><tr><th>Type</th><th>Value</th><th class="num">Hits</th></tr></thead>
+      <tbody>
+        <tr><td>Account</td><td>j.adams@contoso.com</td><td class="num">11</td></tr>
+        <tr><td>Account</td><td>svc-deploy@contoso.com</td><td class="num">9</td></tr>
+        <tr><td>Host</td><td>WIN-FIN-04</td><td class="num">8</td></tr>
+        <tr><td>IP</td><td>185.243.115.84</td><td class="num">7</td></tr>
+        <tr><td>Host</td><td>WIN-HR-12</td><td class="num">6</td></tr>
+        <tr><td>Account</td><td>m.chen@contoso.com</td><td class="num">5</td></tr>
+        <tr><td>IP</td><td>45.66.230.19</td><td class="num">4</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card span-12">
+    <h3>Active incidents <small>not yet closed</small></h3>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Severity</th><th>Title</th><th>Owner</th><th>Entities</th><th class="num">Alerts</th><th class="num">Age</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>INC-1042</td><td><span class="sev high">High</span></td><td>Impossible travel followed by inbox rule creation — j.adams@contoso.com</td><td>—</td><td>1 account · 2 IPs</td><td class="num">4</td><td class="num">12 m</td></tr>
+        <tr><td>INC-1041</td><td><span class="sev high">High</span></td><td>PowerShell encoded command on WIN-FIN-04</td><td>S.Mothukuri</td><td>1 host · 1 account</td><td class="num">3</td><td class="num">38 m</td></tr>
+        <tr><td>INC-1039</td><td><span class="sev med">Medium</span></td><td>OAuth consent to unverified publisher — Files.ReadWrite.All</td><td>—</td><td>2 accounts · 1 app</td><td class="num">2</td><td class="num">1 h 04 m</td></tr>
+        <tr><td>INC-1037</td><td><span class="sev med">Medium</span></td><td>NSG rule opened RDP to 0.0.0.0/0 (rg-prod-web)</td><td>S.Mothukuri</td><td>1 resource · 1 caller</td><td class="num">1</td><td class="num">2 h 11 m</td></tr>
+        <tr><td>INC-1033</td><td><span class="sev low">Low</span></td><td>Sign-in from datacenter ASN (OVH) — m.chen@contoso.com</td><td>—</td><td>1 account · 1 IP</td><td class="num">1</td><td class="num">3 h 47 m</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>
+  Mockup rendered from <code>Workbooks/L3-Triage-Dashboard.json</code>. Sample data shown is illustrative.
+</footer>
+
+</body>
+</html>

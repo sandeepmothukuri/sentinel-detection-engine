@@ -1,0 +1,58 @@
+id: 9b1a4e0d-2c3f-4e7b-8d22-8f5e1d3c9b03
+name: HUN - Mailbox Forwarding to External Domain
+description: |
+  Hypothesis - BEC actors set mailbox-level forwarding (Set-Mailbox
+  -ForwardingSmtpAddress) to silently mirror inbound mail to an attacker
+  address. Surface every change in 14 days where the destination domain
+  differs from the tenant's primary domains.
+hypothesis: |
+  A compromised mailbox is mirroring inbound mail to an external address via
+  Set-Mailbox -ForwardingSmtpAddress / -ForwardingAddress. If true, the actor
+  sees every invoice, password reset, and executive thread without touching
+  the mailbox from the outside.
+requiredTelemetry: |
+  OfficeActivity via the Office 365 connector (Exchange workload). Requires
+  Exchange admin audit logging enabled; mailbox-level audit is not needed.
+tactics:
+  - Collection
+  - Exfiltration
+relevantTechniques:
+  - T1114.003
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+query: |
+  OfficeActivity
+  | where TimeGenerated > ago(14d)
+  | where Operation in ("Set-Mailbox","Set-ForwardingAddress")
+  | extend Params = tostring(Parameters)
+  | extend ForwardSmtp = extract(@"ForwardingSmtpAddress[\s\S]*?'(?:smtp:)?([^']+)'", 1, Params)
+  | extend ForwardAddr = extract(@"ForwardingAddress[\s\S]*?'([^']+)'", 1, Params)
+  | extend Target = coalesce(ForwardSmtp, ForwardAddr)
+  | where isnotempty(Target)
+  | extend TargetDomain = tolower(tostring(split(Target,"@")[1]))
+  | extend UserDomain = tolower(tostring(split(UserId,"@")[1]))
+  | where TargetDomain != UserDomain and isnotempty(TargetDomain)
+  | project TimeGenerated, UserId, Target, TargetDomain, ClientIP, Operation
+expectedFindings: |
+  - Legitimate forwards to counsel, auditors, or personal addresses (known HR cases).
+  - Zero rows is the healthy state for most tenants that block external forwarding.
+  - Any forward to a consumer mail domain (gmail/outlook.com/yahoo) deserves a call
+    to the mailbox owner.
+investigationSteps: |
+  1. Call/verify the mailbox owner out-of-band — was the forward intentional?
+  2. Review the mailbox audit log (MailItemsAccessed, InboxRule, New-InboxRule)
+     for the same window for signs of compromise.
+  3. Check MFA registration and recent sign-ins for the account.
+  4. If confirmed malicious: remove the forward, revoke sessions, reset
+     credentials, and sweep all mailboxes for external forwards.
+escalation: |
+  Escalate to L3/IR immediately if the mailbox is executive, finance, or HR, or
+  if the forward was set from an unusual IP / without user knowledge.
+limitations: |
+  The Parameters extraction relies on the Exchange admin audit serialisation;
+  if Microsoft changes the parameter format the extract returns empty and the
+  hunt goes quiet silently — re-verify monthly. Multi-tenant environments with
+  legitimate cross-domain forwarding will need a domain allow-list.
+version: 1.1.0

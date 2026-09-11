@@ -1,0 +1,60 @@
+id: 9b1a4e0d-2c3f-4e7b-8d22-8f5e1d3c9b05
+name: HUN - Sign-In From Hosting / Datacenter ASN
+description: |
+  Hypothesis - Legitimate users rarely sign in from VPS / hosting providers.
+  Surface successful sign-ins whose IP belongs to a well-known datacenter ASN
+  (Digital Ocean, OVH, Hetzner, Vultr, Linode, AWS, Azure, GCP, Choopa,
+  ColoCrossing). Useful for catching residential-proxy bypass + VPS-hosted
+  AiTM landings.
+hypothesis: |
+  AiTM phishing infrastructure and password-spray tooling run on cheap VPS
+  providers; successful sign-ins proxied through them appear from datacenter
+  ASNs. If true, affected accounts will show datacenter-ASN sign-ins close in
+  time to phishing emails or MFA prompt anomalies.
+requiredTelemetry: |
+  SigninLogs via the Entra ID connector with AutonomousSystemNumber
+  populated.
+tactics:
+  - InitialAccess
+  - DefenseEvasion
+  - CommandAndControl
+relevantTechniques:
+  - T1078.004
+  - T1090.003
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+query: |
+  let dc_asns = dynamic([14061, 16276, 24940, 20473, 63949, 16509, 8075, 15169,
+                        20454, 36352, 53667, 51852, 199524, 14618, 396982]);
+  SigninLogs
+  | where TimeGenerated > ago(24h)
+  | where ResultType == 0
+  | where AutonomousSystemNumber in (dc_asns)
+  | where AppDisplayName !in ("Azure Portal","Microsoft Azure CLI","Microsoft Azure PowerShell")
+  | project TimeGenerated, UserPrincipalName, IPAddress, AutonomousSystemNumber,
+            Location, AppDisplayName, UserAgent
+expectedFindings: |
+  - Cloud engineers signing in from jump VMs (the Azure/CLI exclusions catch
+    the most common cases; document any remaining legitimate flows).
+  - Azure-hosted integrations using delegated user tokens.
+  - Non-interactive app sign-ins from datacenter IPs are the bulk of noise —
+    the ResultType == 0 interactive filter limits but does not eliminate these.
+investigationSteps: |
+  1. Cross-reference with HUN - First-Seen ASN per User for the same accounts.
+  2. Check MFA satisfied-how, device state (compliant? registered?), and CA
+     policy outcome for each sign-in.
+  3. Look at what the account did immediately after (mailbox rules, consent,
+     downloads).
+  4. Unexplained interactive MFA sign-in from a VPS = revoke sessions +
+     reset credentials.
+escalation: |
+  Escalate when the sign-in satisfied MFA from a datacenter ASN on a
+  non-compliant, unregistered device — classic AiTM success condition.
+limitations: |
+  The ASN list is a curated snapshot; thousands of hosting ASNs exist. ASN
+  attribution can shift as providers re-announce ranges. Tenants running
+  legit workloads on VPS providers will need additional AppDisplayName
+  exclusions.
+version: 1.1.0

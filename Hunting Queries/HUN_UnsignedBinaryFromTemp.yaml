@@ -1,0 +1,56 @@
+id: 9b1a4e0d-2c3f-4e7b-8d22-8f5e1d3c9b04
+name: HUN - Unsigned Binary Execution From Temp/AppData
+description: |
+  Hypothesis - Loader stagers (IcedID, Pikabot, Latrodectus) drop unsigned PE
+  files to %TEMP% or %APPDATA% and run them. Surface executions where the
+  process binary is unsigned and lives under those paths.
+hypothesis: |
+  A loader stager dropped to a user-writable directory is executing. If true,
+  the executing binary will be unsigned (or lack signature metadata in the
+  telemetry) and located under user-writable paths, with a browser or mail
+  client as the initiating process lineage.
+requiredTelemetry: |
+  DeviceProcessEvents via Microsoft Defender for Endpoint. Signature state is
+  read from AdditionalFields.IsSigned — verify this field is populated on a
+  sample device before trusting the unsigned filter.
+tactics:
+  - Execution
+  - DefenseEvasion
+relevantTechniques:
+  - T1204.002
+  - T1027
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(24h)
+  | where FolderPath matches regex @"(?i)\\(AppData\\(Local|Roaming)\\Temp|Users\\[^\\]+\\AppData|Windows\\Temp)\\"
+  | where FileName endswith ".exe" or FileName endswith ".dll" or FileName endswith ".scr"
+  | extend Signed = tostring(parse_json(tostring(AdditionalFields)).IsSigned)
+  | where isempty(Signed) or Signed == "False" or Signed == "false"
+  | project TimeGenerated, DeviceName, AccountName, FileName, FolderPath,
+            SHA256, ProcessCommandLine, InitiatingProcessFileName,
+            InitiatingProcessCommandLine
+expectedFindings: |
+  - Installers extracted to %TEMP% by browsers (setup.exe patterns).
+  - Developer tools unpacked to AppData.
+  - The signal: unsigned PEs with random or single-word names, launched by
+    wscript/mshta/Office children, or re-executing after logon.
+investigationSteps: |
+  1. Hash the binary (SHA256) and check reputation + first-seen.
+  2. Walk the initiating process chain; identify the dropper source.
+  3. Check persistence (run keys, scheduled tasks, startup folders) for the
+     same binary.
+  4. If loader suspected: isolate, capture the file before AV quarantine, and
+     hunt the hash estate-wide.
+escalation: |
+  Escalate when the initiating process is Office/script-host or the binary
+  re-executes at logon — loader + persistence in one.
+limitations: |
+  The IsSigned field can be empty for non-PE or stripped telemetry, so the
+  isempty branch adds volume on some estates — verify signal/noise before
+  relying on it. Installs-by-design (per-user installers) are permanent noise
+  and need process-name allow-listing.
+version: 1.1.0
