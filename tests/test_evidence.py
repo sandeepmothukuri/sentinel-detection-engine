@@ -250,3 +250,32 @@ def test_intake_marks_a_shot_captured_in_the_manifest():
         mark_captured(updated, pending["id"], "x.png", "2026-09-11")
     with pytest.raises(IntakeError):
         mark_captured(text, "no-such-shot", "x.png", "2026-09-11")
+
+
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
+
+
+def test_no_image_lives_outside_the_registered_directory():
+    """Every image in this repository is registered, and the register only knows
+    about `docs/images/`. On 2026-09-11 two captures were committed to an
+    `uploads/` directory at the repository root — the leftover attachment copies of
+    pictures already filed, pixel-identical, but outside the register, outside the
+    metadata check and outside the capture manifest. Nothing caught it, because
+    every check in this module scanned `docs/images/` specifically.
+
+    So the check is now a boundary rather than a directory listing: an image
+    anywhere else in the repository fails the build and names its own path.
+    """
+    strays = []
+    for path in REPO.rglob("*"):
+        if ".git" in path.parts or not path.is_file():
+            continue
+        if path.suffix.lower() not in IMAGE_SUFFIXES:
+            continue
+        if IMAGES in path.parents:
+            continue
+        strays.append(str(path.relative_to(REPO)))
+    assert not strays, (
+        "images outside docs/images/ are not covered by the evidence register, the metadata "
+        "check or the capture manifest. File them through scripts/register_screenshot.py, move "
+        "them under docs/images/, or delete the duplicate:\n  " + "\n  ".join(sorted(strays)))

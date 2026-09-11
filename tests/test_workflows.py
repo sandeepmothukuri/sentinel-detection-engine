@@ -146,3 +146,32 @@ def test_actionlint_reports_no_errors() -> None:
                           capture_output=True, text=True, cwd=REPO)
     assert proc.returncode == 0, (
         f"actionlint found problems in the workflow files:\n{proc.stdout}{proc.stderr}")
+
+def test_a_workflow_that_scans_commits_checks_out_with_history() -> None:
+    """gitleaks scans the *commits* a change adds, so it needs the parent commit.
+
+    On 2026-09-11 both `main` and the Dependabot pull request failed at the secrets
+    step with `fatal: ambiguous argument '<sha>^..<sha>': unknown revision` — the
+    default `fetch-depth: 1` clone has no parent to diff against, so the scan errors
+    out instead of scanning. The two workflows that do not scan secrets already set
+    `fetch-depth: 0`; the one that does, did not. This check is the reason it cannot
+    drift back, and it is written against the parsed YAML so a comment or a rename
+    cannot satisfy it by accident.
+    """
+    offenders = []
+    for path in WORKFLOWS:
+        data = load(path)
+        text = path.read_text(encoding="utf-8")
+        if "gitleaks" not in text:
+            continue
+        checkouts = [step for job in data["jobs"].values() for step in job.get("steps", [])
+                     if str(step.get("uses", "")).startswith("actions/checkout")]
+        if not checkouts:
+            offenders.append(f"{path.name}: runs a secrets scan with no checkout")
+            continue
+        for step in checkouts:
+            if (step.get("with") or {}).get("fetch-depth") != 0:
+                offenders.append(
+                    f"{path.name}: the checkout feeding the secrets scan does not set "
+                    f"fetch-depth: 0, so gitleaks cannot resolve its commit range")
+    assert not offenders, "\n  ".join(offenders)

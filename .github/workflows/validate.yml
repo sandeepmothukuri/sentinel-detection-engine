@@ -34,6 +34,16 @@ jobs:
       - name: Check out
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
+          # Full history, because the secrets scan below is not a file scan: gitleaks
+          # runs `git log <range>` to look for credentials in the commits a push or a
+          # pull request actually adds. A shallow checkout has no parent commit to
+          # diff against, so the range is unresolvable and the scan fails with
+          #     fatal: ambiguous argument '<sha>^..<sha>': unknown revision
+          # rather than scanning anything. That is what happened on 2026-09-11, on
+          # `main` and on the Dependabot pull request alike, and it cost 27 seconds a
+          # run to say nothing. The other two workflows already fetched full history;
+          # this one, the only one that scans secrets, did not.
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Python

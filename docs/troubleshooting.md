@@ -52,6 +52,47 @@ generated file, and never to regenerate the *source* from the artefact.
 | `… is stale: the numbers changed in …` | A rule, hunt or ledger entry changed and the chart still shows the old value: `python scripts/render_project_charts.py`, commit the images and `docs/images/generated-charts.json` |
 | `… does not match the digest recorded` | A chart PNG was edited or replaced by hand: redraw it with `python scripts/render_project_charts.py` and commit both files |
 
+### The secrets scan fails with "ambiguous argument" and the rest of the job never runs
+
+**Symptom.** The `Static validation and tests` job fails about 25 seconds in, on the **Secrets scan**
+step, before yamllint or the test suite. The log shows:
+
+```
+gitleaks cmd: gitleaks detect ... --log-opts=--no-merges --first-parent <sha>^..<sha>
+5:17PM ERR [git] fatal: ambiguous argument '<sha>^..<sha>': unknown revision or path not in the working tree.
+5:17PM ERR failed to scan Git repository error="stderr is not empty"
+5:17PM WRN scanned ~0 bytes (0)
+```
+
+It affects `main` and pull requests alike, including Dependabot's. The step reports no leaks — which
+is the dangerous part: it scanned nothing, and a repository that believes it is scanning its commits
+for credentials is worse off than one that knows it is not.
+
+**Cause.** gitleaks is not a file scanner. It runs `git log <range>` to inspect the commits a push or a
+pull request actually adds, so it needs the parent commit to diff against. `actions/checkout` defaults
+to `fetch-depth: 1`, which fetches one commit and no parent: the range is unresolvable and gitleaks
+exits non-zero without scanning.
+
+**Fix.** `fetch-depth: 0` on the checkout step that feeds the scan. The repository's `validate.yml`
+now sets it, with the reason in a comment, and
+[`../tests/test_workflows.py`](../tests/test_workflows.py) fails the build if any workflow that runs
+gitleaks stops fetching full history.
+
+**Verify.** Locally, without GitHub:
+
+```bash
+git clone --depth 1 file:///path/to/repo /tmp/shallow
+cd /tmp/shallow && git log -p -U0 --no-merges --first-parent HEAD^..HEAD   # fatal: ambiguous argument
+git clone file:///path/to/repo /tmp/full
+cd /tmp/full && git log -p -U0 --no-merges --first-parent HEAD^..HEAD >/dev/null && echo resolves
+```
+
+**Related, and time-boxed.** GitHub removes the Node 20 action runtime from its runners on
+**2026-09-16**. Every action still declaring `node20` in its own `action.yml` stops running that day,
+whatever version is pinned in the workflow. The repository pins are managed by Dependabot
+(`.github/dependabot.yml`), and the Node 24 bumps arrive as a Dependabot pull request; it has to be
+merged before that date or CI stops for a reason unrelated to this repository's content.
+
 ### Validation failures
 
 | Failure | Fix |
