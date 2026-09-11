@@ -67,6 +67,15 @@ Four playbooks with a hard safety model — severity gates, confidence threshold
 
 [L3 Triage Dashboard](Workbooks/L3-Triage-Dashboard.json) — incident KPIs, severity donut, top firing rules, daily detection trend, tactic distribution, top entities, MTTA/MTTR, **tuning indicators** (rules with the highest benign-positive closure rate), and the open-incident queue.
 
+<details open>
+<summary><strong>Dashboard preview</strong> — static render; deploy the JSON to Microsoft Sentinel for live data</summary>
+
+![L3 Triage Dashboard mockup](docs/images/00-dashboard-mockup.png)
+
+Interactive version: [docs/dashboard-preview.html](docs/dashboard-preview.html) — GitHub serves HTML files as source, not rendered; clone and open it in a browser.
+
+</details>
+
 ## Deployment
 
 Three paths, documented in [docs/deployment.md](docs/deployment.md): Sentinel Repositories (GitOps — CI publishes a schema-clean copy via `scripts/package_rules.py`), manual import, and release tarballs. Includes connector enablement, least-privilege roles per playbook identity, and secret handling. Free-tier quickstart: [docs/30-minute-walkthrough.md](docs/30-minute-walkthrough.md) · [docs/free-tier-setup.md](docs/free-tier-setup.md).
