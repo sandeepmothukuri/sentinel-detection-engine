@@ -1,0 +1,37 @@
+---
+title: ATT&CK v19 — what changed under the rules that reference Defense Evasion
+---
+flowchart TB
+  subgraph V18["ATT&amp;CK v18"]
+    direction TB
+    A["TA0005 Defense Evasion<br/>one tactic"]
+    A --> T1562["T1562 Impair Defenses<br/>and its sub-techniques<br/>T1562.001 · T1562.006 · T1562.007"]
+  end
+
+  subgraph V19["ATT&amp;CK v19 (2026-04-28)"]
+    direction TB
+    B["TA0005 Stealth<br/>technique ids unchanged"]
+    C["TA0112 Defense Impairment<br/>new tactic"]
+    D["T1685 Impair Defenses<br/>merges T1562 + T1562.001 + T1562.006"]
+    E["T1686.001<br/>successor to T1562.007"]
+    B --> D
+    C --> D
+    C --> E
+  end
+
+  T1562 -->|"migrated"| D
+  A -->|"split into two tactics"| B
+  A --> C
+
+  subgraph REPO["How this repository handles it"]
+    direction TB
+    F["attack-navigator/layer.json<br/>declares versions.attack = 19"]
+    G["scripts/attack_data.json<br/>vendored MITRE CTI dataset"]
+    H["scripts/ci_validate.py<br/>normalises stealth and defense-impairment<br/>to the classic tactic vocabulary<br/>Microsoft Sentinel still uses in rule YAML"]
+    I["A rule citing a retired id fails the build"]
+    F --> H
+    G --> H
+    H --> I
+  end
+
+  E --> REPO

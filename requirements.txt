@@ -1,0 +1,18 @@
+# Toolchain for validating and regenerating this repository.
+#
+# Declared in one place because CI installed a hand-written list that drifted from
+# what the gates actually import: tests/test_evidence.py imports Pillow and
+# scripts/render_design_preview.py imports matplotlib, neither of which appeared in
+# the workflow's `pip install` line. `tests/test_requirements.py` now fails if a
+# third-party import in scripts/ or tests/ is missing from this file.
+#
+# Install:  pip install -r requirements.txt
+#
+# All five are needed by CI: matplotlib and Pillow are imported by the design-preview
+# and chart gates, and render_project_charts.py --check redraws each figure in memory
+# so it can compare the numbers it would draw against the recorded ones.
+PyYAML>=6.0,<7
+yamllint>=1.35,<2
+pytest>=8.0,<9
+matplotlib>=3.8,<4
+Pillow>=10.0

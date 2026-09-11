@@ -1,0 +1,25 @@
+---
+title: Incident response lifecycle — where detection and tuning meet IR
+---
+flowchart TB
+  DET["Detection<br/>analytic rule fires or a hunt surfaces a lead"] --> TRIAGE["1 · Triage<br/>L1 disposition, dedup, enrich"]
+  TRIAGE --> SEV{"Severity and confidence"}
+
+  SEV -->|"low, unresolved"| MON["Monitor<br/>comment on the incident, no containment"]
+  SEV -->|"high or corroborated"| INVEST["2 · Investigate<br/>L2, entity pivots, scope the blast radius"]
+
+  INVEST --> CONTAIN["3 · Contain<br/>disable account · isolate device · block IP<br/><b>only through the SOAR safety gate</b>"]
+  CONTAIN --> ERAD["4 · Eradicate<br/>remove persistence, rotate secrets,<br/>revoke sessions and tokens"]
+  ERAD --> RECOVER["5 · Recover<br/>restore access under conditions,<br/>release isolation after evidence is held"]
+  RECOVER --> CLOSE["6 · Close<br/>classification recorded, incident closed"]
+
+  CLOSE --> POST["7 · Postmortem<br/>within five business days, blameless"]
+  POST --> ACTIONS["Action items with owner and date"]
+  POST --> TUNE["Detection gaps and false positives<br/>feed the tuning log"]
+  TUNE --> DET
+  ACTIONS --> REVIEW["Quarterly review:<br/>was the action completed?"]
+  REVIEW --> DET
+
+  MON --> CLOSE
+
+  NOTE["Containment is the only step in this flow that a playbook may take<br/>without an analyst, and only when the confidence, severity<br/>and allowlist gates all pass."] --- CONTAIN

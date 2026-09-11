@@ -58,8 +58,8 @@ unreachable branch, a wrong field name, a mapping that is plausible but wrong â€
 find. One such defect (a parameter reference with the wrong casing) was found by this repository's
 own validator rather than by a reviewer.
 
-**Mitigation in place.** The compensating control is mechanical rather than social: 15 validation
-families, 148 tests including negative tests that prove the validator rejects bad input, five drift
+**Mitigation in place.** The compensating control is mechanical rather than social: 18 validation
+checks in 9 families, 156 tests including negative tests that prove the validator rejects bad input, six drift
 gates, and documentation numbers that fail the build when they stop matching the repository. A
 validator that fails loudly is a partial substitute for a reviewer, and the repository says which
 it has.

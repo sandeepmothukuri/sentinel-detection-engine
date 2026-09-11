@@ -1,0 +1,100 @@
+{
+  "images": {
+    "attack/05-coverage-redundancy.png": {
+      "data": {
+        "backed_by_one_rule": 24,
+        "backed_by_two_or_more_rules": 3,
+        "covered_techniques": 37,
+        "hunting_query_only": 10,
+        "rules_per_technique": {
+          "T1021.002": 1,
+          "T1021.006": 1,
+          "T1027": 1,
+          "T1059.001": 1,
+          "T1071.001": 1,
+          "T1078.004": 2,
+          "T1087.004": 1,
+          "T1098": 1,
+          "T1098.001": 2,
+          "T1098.003": 1,
+          "T1110": 1,
+          "T1110.003": 1,
+          "T1114.003": 1,
+          "T1190": 1,
+          "T1213.002": 1,
+          "T1218.005": 1,
+          "T1218.011": 1,
+          "T1486": 1,
+          "T1490": 1,
+          "T1528": 1,
+          "T1539": 1,
+          "T1555.005": 1,
+          "T1564.008": 1,
+          "T1567.002": 1,
+          "T1569.002": 1,
+          "T1621": 1,
+          "T1686.001": 2
+        }
+      },
+      "sha256": "39b094dd5b3620e94944b8f7070f7c68ec88e3e68ceccadad7868f0144399919"
+    },
+    "detections/04-inventory-overview.png": {
+      "data": {
+        "content_per_connector": {
+          "AzureActiveDirectory": 9,
+          "AzureActivity": 2,
+          "AzureKeyVault": 1,
+          "MicrosoftThreatProtection": 13,
+          "Office365": 3
+        },
+        "content_per_table": {
+          "AuditLogs": 4,
+          "AzureActivity": 2,
+          "AzureDiagnostics": 1,
+          "DeviceFileEvents": 1,
+          "DeviceInfo": 1,
+          "DeviceNetworkEvents": 3,
+          "DeviceProcessEvents": 10,
+          "OfficeActivity": 3,
+          "SigninLogs": 5
+        },
+        "hunting_queries": 10,
+        "rules": 18,
+        "rules_by_frequency": {
+          "1h": 17,
+          "30m": 1
+        },
+        "rules_by_severity": {
+          "High": 14,
+          "Medium": 4
+        }
+      },
+      "sha256": "453b787f860e7c177ece0ff67435687de4a29581d5a9d327e0396a967dc91bd4"
+    },
+    "sentinel/03-validation-status.png": {
+      "data": {
+        "atomic_citations": 31,
+        "context_only_atomic": 3,
+        "entries": 28,
+        "manual_procedure_only": 14,
+        "statuses": {
+          "STATIC VALIDATION": 28
+        },
+        "trigger_atomic_cited": 11
+      },
+      "sha256": "ef455ff658e1e2537089f1c314974ee650c071334cd06927148d85b19d557fed"
+    },
+    "social/preview-card.png": {
+      "data": {
+        "atomic_citations": 31,
+        "attack_techniques": 37,
+        "hunting_queries": 10,
+        "ledger_entries": 28,
+        "playbooks": 4,
+        "rules": 18,
+        "telemetry_tables": 9
+      },
+      "sha256": "a0919af52cb485d088a2e2acf9f0775cea89e5ace6875498c693889c481bb37a"
+    }
+  }
+}

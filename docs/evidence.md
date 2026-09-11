@@ -81,6 +81,20 @@ secrets. The script removes what is attached to the file, not what is on the scr
   containment → verification and audit → tuning loop back into the rule.
 - **Redactions:** None required.
 
+### `architecture/03-deployment-paths.png`
+- **Provenance class:** Diagram
+- **Source:** `docs/diagrams/architecture/03-deployment-paths.mmd`, rendered by `scripts/render_diagrams.py`
+- **Environment:** None. The three paths drawn are the three documented in
+  [`deployment.md`](deployment.md); the diagram is a rendering of that prose, not a
+  screenshot of a deployment.
+- **Date:** 2026-09-11
+- **Demonstrates:** The three ways the rule pack reaches a workspace — a Sentinel
+  Repositories connection consuming the generated ARM templates in `deploy/`, an import of the
+  packaged YAML produced by `scripts/package_rules.py`, or a manual portal import — and where each
+  path's prerequisites stop. It records the constraint that decided the design: a Sentinel
+  repository deploys Bicep or ARM only, so raw `Detections/*.yaml` is not deployable on its own.
+- **Redactions:** None required. No workspace, subscription or tenant value appears.
+
 ## sentinel
 
 ### `sentinel/01-connector-table-coverage.png`
@@ -93,6 +107,31 @@ secrets. The script removes what is attached to the file, not what is on the scr
   table: SigninLogs 5, AuditLogs 4, OfficeActivity 3, DeviceProcessEvents 10, DeviceNetworkEvents 3,
   DeviceFileEvents 1, DeviceInfo 1, AzureActivity 2, AzureDiagnostics 1.
 - **Redactions:** None required. This is the deployment shape, not a tenant's state.
+
+### `sentinel/02-evidence-and-validation-model.png`
+- **Provenance class:** Diagram
+- **Source:** `docs/diagrams/sentinel/02-evidence-and-validation-model.mmd`
+- **Environment:** None.
+- **Date:** 2026-09-11
+- **Demonstrates:** What each level of evidence in this repository can and cannot support, from
+  static validation through the atomic mapping in `tests/validation/atomics.yaml` to the
+  measurements that only a live tenant can produce. It is the picture behind the
+  `STATIC VALIDATION` label that every row of [`metrics-matrix.md`](metrics-matrix.md) carries:
+  which checks ran, which are waiting on an environment, and which claims the repository therefore
+  declines to make.
+- **Redactions:** None required.
+
+### `sentinel/03-validation-status.png`
+- **Provenance class:** Generated chart
+- **Source:** `scripts/render_project_charts.py`, reading `tests/validation/atomics.yaml`.
+- **Environment:** None. Every bar is a count over the ledger file.
+- **Date:** 2026-09-11
+- **Demonstrates:** How the 28 ledger entries are validated today: 11 cite a trigger atomic that
+  exists upstream, 3 cite atomics for context only (2 `partial`, 1 `precondition`), and 14 carry a
+  manual procedure because upstream Atomic Red Team has no atomic for that behaviour. The caption
+  states the honest reading — all 28 entries are at `STATIC VALIDATION`, and a mapping is a plan,
+  not a result.
+- **Redactions:** None required.
 
 ## detections
 
@@ -115,6 +154,34 @@ secrets. The script removes what is attached to the file, not what is on the scr
 - **Demonstrates:** Which validation gate inspects which section of a rule file — schema and
   scheduling bounds, ATT&CK coherence, telemetry-to-connector parity, KQL lint and time bounds,
   entity validity, alert-detail placeholders, metadata quality, and the validation ledger.
+- **Redactions:** None required.
+
+### `detections/03-tuning-and-feedback-loop.png`
+- **Provenance class:** Diagram
+- **Source:** `docs/diagrams/detections/03-tuning-and-feedback-loop.mmd`
+- **Environment:** None. The loop matches the process written down in
+  [`tuning.md`](tuning.md) and the log shape in
+  [`workflows/tuning-log.md`](workflows/tuning-log.md).
+- **Date:** 2026-09-11
+- **Demonstrates:** What happens after an alert, which is where most detection repositories stop:
+  how a false positive is classified, whether the fix is a threshold, an exclusion, an entity
+  mapping or a rewrite, what has to be recorded for the change to be reviewable, and why a rule is
+  retired rather than quietly left running.
+- **Redactions:** None required.
+
+### `detections/04-inventory-overview.png`
+- **Provenance class:** Generated chart
+- **Source:** `scripts/render_project_charts.py`, reading `Detections/*.yaml` and
+  `Hunting Queries/*.yaml`.
+- **Environment:** None. Four panels: severity, telemetry tables, scheduling frequency, connectors.
+- **Date:** 2026-09-11
+- **Demonstrates:** The shape of the inventory in one picture: 18 scheduled rules (14 High, 4
+  Medium) and 10 hunting queries; 9 Log Analytics tables (DeviceProcessEvents 10,
+  SigninLogs 5, AuditLogs 4, OfficeActivity 3, DeviceNetworkEvents 3, AzureActivity 2,
+  AzureDiagnostics 1, DeviceFileEvents 1, DeviceInfo 1); 17 rules on an hourly schedule and 1 on
+  30 minutes; and 5 connectors (MicrosoftThreatProtection 13, AzureActiveDirectory 9, Office365 3,
+  AzureActivity 2, AzureKeyVault 1). Table and connector counts include the hunting queries, which
+  is the same population [`data-sources.md`](data-sources.md) summarises.
 - **Redactions:** None required.
 
 ## hunting
@@ -143,6 +210,19 @@ secrets. The script removes what is attached to the file, not what is on the scr
   flow requires a confidence threshold, independent corroboration, and a safety gate that routes
   privileged or break-glass accounts, allowlisted entities and unclear blast radii back to
   analyst review. Every automated action still ends in verification, audit and a rollback path.
+- **Redactions:** None required.
+
+### `soar/02-ir-lifecycle.png`
+- **Provenance class:** Diagram
+- **Source:** `docs/diagrams/soar/02-ir-lifecycle.mmd`
+- **Environment:** None. The phases and their owners match
+  [`workflows/ir-runbook.md`](workflows/ir-runbook.md) and the escalation thresholds in
+  [`workflows/escalation-matrix.md`](workflows/escalation-matrix.md).
+- **Date:** 2026-09-11
+- **Demonstrates:** The incident lifecycle the playbooks in `Playbooks/` are written against —
+  detection, triage, containment decision, the safety gate that stops an unattended destructive
+  action, verification, audit record and rollback — and where human authority is required rather
+  than optional.
 - **Redactions:** None required.
 
 ## workbooks
@@ -175,7 +255,8 @@ secrets. The script removes what is attached to the file, not what is on the scr
 
 *Numbering note: there is no `attack/02`. The Navigator export was renumbered to `03` when it moved
 into this directory, and the number was left as a gap rather than reused, so that a link to the old
-path fails loudly instead of silently resolving to a different image.*
+path fails loudly instead of silently resolving to a different image. Numbering for images added
+later starts at `04` for the same reason.*
 
 ### `attack/01-attack-coverage-by-tactic.png`
 - **Provenance class:** Generated chart
@@ -216,6 +297,33 @@ path fails loudly instead of silently resolving to a different image.*
   queue, or the deployed workbook. Those would require a live workspace with real telemetry, and
   no such screenshot can be produced honestly from this repository.
 
+### `attack/04-attack-v19-domain-change.png`
+- **Provenance class:** Diagram
+- **Source:** `docs/diagrams/attack/04-attack-v19-domain-change.mmd`
+- **Environment:** None. Rendered from the mapping discipline described in
+  [`ATTACK.md`](ATTACK.md) and the vendored dataset at `scripts/attack_data.json`.
+- **Date:** 2026-09-11
+- **Demonstrates:** What changed in MITRE ATT&CK v19 for Enterprise and how this repository absorbs
+  it: Defense Evasion (TA0005) retires into Stealth (TA0005) and Defense Impairment (TA0112),
+  T1562 and its sub-techniques merge into T1685, and T1562.007's successor is T1686.001. It also
+  shows the compatibility decision — the layer declares v19 while the comparison code normalises
+  the split tactics back to `DefenseEvasion`, so coverage counts stay comparable instead of
+  silently dropping the techniques that moved.
+- **Redactions:** None required.
+
+### `attack/05-coverage-redundancy.png`
+- **Provenance class:** Generated chart
+- **Source:** `scripts/render_project_charts.py`, reading `attack-navigator/layer.json` and the 18
+  scheduled rule files.
+- **Environment:** None.
+- **Date:** 2026-09-11
+- **Demonstrates:** The depth behind the coverage number, which the per-tactic coverage chart does
+  not show: of the 37 covered techniques, 24 are backed by exactly one scheduled rule, 3 by two
+  rules, and 10 are covered only by a hunting query that an analyst has to run. It is drawn because
+  a rule count is a coverage claim, and a coverage claim with no redundancy behind it is worth
+  stating plainly — [`limitations.md`](limitations.md) L4 does.
+- **Redactions:** None required.
+
 ## ci-cd
 
 ### `ci-cd/01-validation-pipeline.png`
@@ -226,7 +334,7 @@ path fails loudly instead of silently resolving to a different image.*
   run.
 - **Date:** 2026-09-11
 - **Demonstrates:** The order of the checks a change must survive on the way to `main`, including
-  the five drift gates (coverage and layer, validation ledger, `deploy/`, quality matrix, workbook preview digest)
+  the six drift gates (coverage and layer, validation ledger, `deploy/`, quality matrix, workbook preview digest, generated charts)
   that fail the build when a generated artefact stops matching the files it is derived from. The
   sequence is the argument: nothing reaches the packaging step until the generated artefacts have
   been proven reproducible.
@@ -243,6 +351,23 @@ path fails loudly instead of silently resolving to a different image.*
   (read-only) from the job that holds the comment permission (runs no contributor code, consumes
   only the uploaded artefact). The diagram lists what the release archive actually contains,
   including the generated `deploy/` templates.
+- **Redactions:** None required.
+
+## social
+
+### `social/preview-card.png`
+- **Provenance class:** Generated chart
+- **Source:** `scripts/render_project_charts.py`, reading the rule files, the hunting queries,
+  `attack-navigator/layer.json`, `tests/validation/atomics.yaml` and `Playbooks/`.
+- **Environment:** None. 1280×640, the size GitHub's social preview expects.
+- **Date:** 2026-09-11
+- **Demonstrates:** The repository's own counts as a preview card: 18 scheduled rules, 10 hunting
+  queries, 37 ATT&CK techniques, 28 ledger entries, 9 telemetry tables, 4 playbooks and 31 atomic
+  citations, every figure computed at draw time. It carries the same disclaimer the rest of this
+  register does, in the image: **static validation only** — nothing in the repository has been
+  executed against a live tenant, and every unmeasured metric reads `Not yet measured`. It is a
+  card, not a console: it contains no fabricated alert, incident or metric, and nothing in it is
+  dressed up as a screenshot.
 - **Redactions:** None required.
 
 ---
@@ -271,6 +396,10 @@ python scripts/render_design_preview.py --check    # CI gate
 # Coverage chart (offline, deterministic)
 python scripts/render_coverage_chart.py
 
+# Charts and the social preview card (offline, deterministic)
+python scripts/render_project_charts.py
+python scripts/render_project_charts.py --check   # CI gate: numbers and digests
+
 # The numbers behind the layer and the chart
 python scripts/generate_coverage.py
 python scripts/generate_atomics_ledger.py
@@ -284,7 +413,15 @@ python scripts/generate_metrics_matrix.py
 python scripts/generate_metrics_matrix.py --check   # CI gate
 ```
 
-All six generators are deterministic and are invoked by CI, which fails on any diff they produce.
+All of these generators are deterministic and are invoked by CI, which fails on any diff they
+produce or on any `--check` that does not pass.
+
+`render_project_charts.py` is the one gate that compares numbers rather than pixels: `--check`
+redraws each chart in memory and compares the values it would print against those recorded in
+`docs/images/generated-charts.json`, then verifies each committed PNG against its recorded SHA-256.
+Comparing the drawn values rather than the rendered bytes means a different matplotlib release
+cannot fail a gate over a picture nobody changed, while a rule that was added without redrawing the
+charts still fails the build.
 If an artefact in this repository and the command that generates it ever disagree, the command is
 right and the file is stale.
 

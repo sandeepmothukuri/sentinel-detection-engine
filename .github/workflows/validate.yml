@@ -36,10 +36,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Installed from requirements.txt, not from a list typed here: the two drifted
+      # once already (Pillow and matplotlib were imported by the gates below and
+      # installed by nobody), and tests/test_requirements.py now fails if they diverge.
       - name: Install validators
         run: |
           python -m pip install --upgrade pip
-          pip install pyyaml yamllint pytest
+          pip install -r requirements.txt
 
       - name: Secrets scan
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.9
@@ -96,6 +99,13 @@ jobs:
 
       - name: Check the workbook design preview matches its recorded digest
         run: python scripts/render_design_preview.py --check
+
+      # Redraws every chart in memory and compares the numbers against the recorded
+      # ones, then checks each committed PNG against its digest. A chart whose
+      # numbers no longer match the rule files fails here rather than misleading a
+      # reader for another release.
+      - name: Check the generated charts are current
+        run: python scripts/render_project_charts.py --check
 
       - name: Package the metadata-stripped rule YAML
         run: python scripts/package_rules.py

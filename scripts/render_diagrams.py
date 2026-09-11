@@ -42,11 +42,16 @@ RENDERER = "https://mermaid.ink/img/"
 LAYOUT: dict[str, tuple[str, int]] = {
     "architecture/01-logical-architecture.mmd": ("architecture/01-logical-architecture.png", 0),
     "architecture/02-telemetry-to-detection-flow.mmd": ("architecture/02-telemetry-to-detection-flow.png", 0),
+    "architecture/03-deployment-paths.mmd": ("architecture/03-deployment-paths.png", 0),
     "sentinel/01-connector-table-coverage.mmd": ("sentinel/01-connector-table-coverage.png", 0),
+    "sentinel/02-evidence-and-validation-model.mmd": ("sentinel/02-evidence-and-validation-model.png", 0),
     "detections/01-rule-development-lifecycle.mmd": ("detections/01-rule-development-lifecycle.png", 0),
     "detections/02-analytics-rule-anatomy.mmd": ("detections/02-analytics-rule-anatomy.png", 0),
+    "detections/03-tuning-and-feedback-loop.mmd": ("detections/03-tuning-and-feedback-loop.png", 0),
     "hunting/01-hunt-to-detection-workflow.mmd": ("hunting/01-hunt-to-detection-workflow.png", 0),
     "soar/01-soar-safety-gate-flow.mmd": ("soar/01-soar-safety-gate-flow.png", 0),
+    "soar/02-ir-lifecycle.mmd": ("soar/02-ir-lifecycle.png", 0),
+    "attack/04-attack-v19-domain-change.mmd": ("attack/04-attack-v19-domain-change.png", 0),
     "ci-cd/01-validation-pipeline.mmd": ("ci-cd/01-validation-pipeline.png", 0),
     "ci-cd/02-release-and-pr-automation.mmd": ("ci-cd/02-release-and-pr-automation.png", 0),
 }

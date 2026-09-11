@@ -27,7 +27,7 @@ tests, and the full L3 SOC workflow documentation to go with them.
 | **Reporting** | L3 triage workbook (13 panels), generated ATT&CK coverage, static HTML dashboard preview |
 | **ATT&CK coverage** | 37 unique techniques across 12 of the 14 enterprise tactics |
 | **Validation** | 28 ledger entries; 31 cited atomic test references verified to exist upstream; 14 rules with a written manual procedure where no atomic can exercise them |
-| **Quality gates** | 15 check families in `scripts/ci_validate.py`, 148 tests, 5 CI drift gates, secret scanning, SHA-pinned actions |
+| **Quality gates** | 18 checks in 9 families in `scripts/ci_validate.py`, 156 tests, 6 CI drift gates, secret scanning, SHA-pinned actions |
 | **Author** | Sandeep Mothukuri |
 
 ## 2. Why this exists
@@ -171,10 +171,10 @@ Every push and pull request runs:
 |---|---|
 | `gitleaks` | Any committed secret. Never disabled, never `continue-on-error`. |
 | `yamllint` | Malformed rule, hunt and workflow YAML |
-| `scripts/ci_validate.py` | 15 check families: schema, UUID, uniqueness, severity, status, `kind`, scheduling bounds, ATT&CK ids and tactic coherence, table↔connector parity, entity identifiers, alert-detail placeholders, metadata quality bar, placeholder text, KQL lint, explicit `ago()` bound, `TimeGenerated` retained by the final projection, and the whole validation ledger |
-| `pytest` | 148 tests in nine modules: 28 rule tests, 33 negative tests that prove the validator rejects bad input, 23 ledger tests, 16 tests of the generated deployment templates, 15 tests of image evidence hygiene, 8 tests of the diagrams, the workbook wireframe and the image register, 9 backtesting-contract tests, 7 Sigma converter tests, 9 tests that fail if a documented number drifts, including that every rule appears in the generated quality matrix |
+| `scripts/ci_validate.py` | 18 checks in 9 families: **schema** (required fields, UUID and name uniqueness, severity and status vocabulary, `kind`) · **scheduling** (`queryFrequency` and `queryPeriod` bounds, frequency ≤ period) · **ATT&CK** (technique ids exist in the vendored MITRE matrix, tactics cohere) · **telemetry** (every table the query reads is produced by a declared connector) · **entity mapping** (identifiers are real and the columns exist) · **alert details** (placeholders reference columns the query returns) · **metadata** (the production bar: `validationStatus`, `falsePositives`, `tuningGuidance`, `suppression`) · **KQL** (lint, explicit `ago()` bound, `TimeGenerated` retained by the final projection) · **validation ledger** (one entry per rule and vice versa, closed status vocabulary, citations that resolve upstream, a trigger atomic or a manual procedure) |
+| `pytest` | 156 tests in ten modules: 28 rule tests, 33 negative tests that prove the validator rejects bad input, 23 ledger tests, 16 tests of the generated deployment templates, 15 tests of image evidence hygiene, 11 tests of everything drawn or registered (diagram counts, the chart gates, the workbook wireframe, the register), 9 backtesting-contract tests, 7 Sigma converter tests, 11 tests that fail if a documented number drifts, including the validator's own check total, and 3 tests that keep the CI toolchain and `requirements.txt` from diverging |
 | `scripts/check_links.py` | Broken relative links in documentation |
-| Drift ×5 | `coverage.md` + `attack-navigator/layer.json`, `tests/atomics.md`, `deploy/`, `docs/metrics-matrix.md` and the workbook preview digest must match what the generators produce |
+| Drift ×6 | `coverage.md` + `attack-navigator/layer.json`, `tests/atomics.md`, `deploy/`, `docs/metrics-matrix.md`, the workbook preview digest and the generated charts must match what the generators produce. The chart gate compares the numbers it would draw, then the digests — re-rasterising a chart is not a repository change |
 | `scripts/generate_arm_templates.py` | Regenerates `deploy/` — the ARM templates a Sentinel Repositories connection actually consumes — from the rule files |
 | `scripts/generate_metrics_matrix.py` | Regenerates `docs/metrics-matrix.md` from the rule files and the validation ledger |
 | `scripts/package_rules.py` | Produces the metadata-stripped YAML artefact for manual import |
@@ -189,7 +189,7 @@ its gate before publishing a signed-checksum archive.
 
 ## 10. Testing
 
-148 tests, no network access required, under eight seconds.
+156 tests, no network access required, under ten seconds.
 
 | Suite | What it covers |
 |---|---|
@@ -258,10 +258,11 @@ executed, and the gates that have to pass first.
 
 ## 13. Screenshots and diagrams
 
-The repository contains 12 images: **11 generated from source in this repository and 1 real
-screenshot** — the ATT&CK Navigator rendering the committed layer. **No image shows a live
-Microsoft Sentinel tenant, and none contains invented incident numbers, alert counts, user names or
-hostnames.**
+The repository contains 21 images: **20 generated from source in this repository and 1 real
+screenshot** — the ATT&CK Navigator rendering the committed layer. That is 14 Mermaid diagrams,
+5 charts drawn from committed repository data, and 1 workbook design preview. **No image shows a
+live Microsoft Sentinel tenant, and none contains invented incident numbers, alert counts, user
+names or hostnames.**
 
 Captures of a live workspace cannot be produced by a repository, and an invented one would be a
 fabrication. So the images that would prove the most — a deployed rule list, an incident the pack
@@ -273,8 +274,8 @@ build if the entry lacks an environment, a date, a redaction statement or a comp
 
 | Image | Kind |
 |---|---|
-| Architecture, telemetry flow, connector coverage, rule lifecycle, rule anatomy, hunt workflow, SOAR gate, CI pipelines | Diagrams generated from Mermaid source in `docs/diagrams/` |
-| ATT&CK coverage chart | Chart generated from `attack-navigator/layer.json` |
+| Architecture (logical, telemetry flow, deployment paths), connector coverage, evidence model, rule lifecycle, rule anatomy, tuning loop, hunt workflow, SOAR safety gate, IR lifecycle, CI pipelines, the v19 domain change | 14 diagrams generated from Mermaid source in `docs/diagrams/`. The `.mmd` file is the source of truth; the PNG is an export |
+| ATT&CK coverage chart, coverage depth, detection inventory, validation status, GitHub social preview card | 5 charts drawn at build time by `scripts/render_project_charts.py` and `scripts/render_coverage_chart.py` from `attack-navigator/layer.json`, the rule files, the hunting queries and `tests/validation/atomics.yaml`. Every number on every chart is recomputed and compared in CI; no chart carries a hand-typed value |
 | L3 workbook design preview | Drawing generated from the workbook definition, carrying the banner *"Design preview — requires deployment to display live telemetry"* and showing `—` where values would appear |
 | ATT&CK Navigator export | Screenshot of the committed layer rendered in Navigator on the author's workstation |
 
@@ -337,7 +338,7 @@ out in [`docs/limitations.md`](docs/limitations.md).
 ## 16. Roadmap
 
 **Completed** — the rule pack with its metadata bar; hunting queries with full hunt metadata; four
-playbooks with safety gates; 15-family CI validator; 148-test suite including negative tests;
+playbooks with safety gates; 18-check CI validator; 156-test suite including negative tests;
 generated ATT&CK coverage, validation ledger and ARM deployment templates, all drift-gated;
 evidence register; Microsoft current-state alignment; SHA-pinned CI with least privilege.
 

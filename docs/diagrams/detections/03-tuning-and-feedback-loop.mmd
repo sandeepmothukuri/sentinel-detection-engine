@@ -1,0 +1,29 @@
+---
+title: Tuning and feedback loop — how a firing rule changes
+---
+flowchart LR
+  RUN["Rule runs on schedule<br/>queryFrequency · queryPeriod"] --> ALERT["Alert raised<br/>entity-mapped"]
+  ALERT --> INC["Incident<br/>grouped by entity"]
+  INC --> TRIAGE["Triage<br/>disposition per the SOP"]
+  TRIAGE --> CLASS{"Classification"}
+  CLASS -->|"true positive"| IR["Incident response<br/>contain · eradicate · recover"]
+  CLASS -->|"false positive"| TLOG["Tuning log entry<br/>benign pattern · proposed change · owner · due date"]
+  CLASS -->|"benign positive"| TLOG
+
+  TLOG --> DECIDE{"What kind of change?"}
+  DECIDE -->|"threshold"| TH["Edit the named let binding<br/>rule metadata.tuningGuidance updated"]
+  DECIDE -->|"known-good actor"| WL["Watchlist exclusion<br/>owned and reviewed, not a query edit"]
+  DECIDE -->|"gap in the rule"| Q["Rewrite the query"]
+  DECIDE -->|"acceptable noise"| ACC["Accepted risk<br/>recorded with a named owner"]
+
+  TH --> VER["Version bumped · CI must pass"]
+  Q --> VER
+  WL --> VER
+  VER --> LEDGER["Validation ledger checked:<br/>did the evidence path change?"]
+  LEDGER --> RUN
+
+  IR --> METRICS["Metrics recorded<br/>volume · precision · latency · MTTA · MTTR"]
+  ACC --> METRICS
+  METRICS --> RUN
+
+  NOTE["Measured values live in tests/validation/performance-metrics.md.<br/>The per-rule framework is generated: docs/metrics-matrix.md"] --- METRICS

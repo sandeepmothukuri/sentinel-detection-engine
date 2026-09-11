@@ -1,0 +1,20 @@
+---
+title: Deployment paths — which format each consumer accepts
+---
+flowchart TB
+  SRC["Authoring source (the reviewed artefact)<br/>Detections/*.yaml · Hunting Queries/*.yaml<br/>analytics-rule YAML, human-readable, carries metadata:"]
+  SRC --> GEN["scripts/generate_arm_templates.py<br/>generated · drift-gated in CI"]
+  GEN --> ARM["deploy/analytic-rules/*.json<br/>deploy/hunting-queries/*.json<br/>Microsoft.OperationalInsights resources"]
+  SRC --> PKG["scripts/package_rules.py<br/>metadata block stripped"]
+  PKG --> YAML["dist/sentinel-yaml/*.yaml<br/>rule alone, no authoring notes"]
+
+  ARM --> P1["Sentinel Repositories connection<br/>Analytics rules → deploy/analytic-rules<br/>Hunting queries → deploy/hunting-queries"]
+  ARM --> P2["Portal: Analytics → Import<br/>ARM JSON, max 50 rules per file"]
+  ARM --> P3["az deployment group create<br/>one template per rule"]
+  YAML --> P4["Reviewer, or a diff against the<br/>portal export format"]
+
+  P1 --> WS[("Log Analytics workspace<br/>Microsoft Sentinel enabled")]
+  P2 --> WS
+  P3 --> WS
+
+  NOTE["A repositories connection pointed at Detections/ deploys nothing:<br/>it consumes ARM or Bicep, not the authoring YAML."] --- GEN

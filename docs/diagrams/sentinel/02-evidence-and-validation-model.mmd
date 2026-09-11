@@ -1,0 +1,23 @@
+---
+title: Validation evidence model — what each status is allowed to claim
+---
+flowchart LR
+  subgraph LADDER["Validation status ladder — tests/validation/atomics.yaml"]
+    direction LR
+    S1["STATIC VALIDATION<br/>schema · KQL lint · ATT&amp;CK coherence<br/>telemetry parity · metadata bar<br/><b>all 28 ledger entries sit here</b>"]
+    S2["SIMULATED<br/>injected synthetic events<br/>in a live workspace"]
+    S3["VALIDATED IN LIVE TENANT<br/>the behaviour was executed<br/>and the rule fired"]
+    S1 -->|"manual procedure executed,<br/>or an atomic run"| S2
+    S2 -->|"the same, against<br/>production telemetry"| S3
+    S1 -.->|"no evidence file:<br/>CI refuses the claim"| X["cannot advance"]
+  end
+
+  subgraph EVID["Evidence classes for images — docs/evidence.md"]
+    direction LR
+    E1["Diagram<br/>original Mermaid source<br/>committed in this repository"]
+    E2["Generated chart<br/>drawn by a script<br/>from committed data"]
+    E3["Screenshot<br/>captured from a real environment,<br/>metadata stripped, redactions listed"]
+  end
+
+  LADDER --> R["A picture never moves<br/>a rule up the ladder"]
+  EVID --> R

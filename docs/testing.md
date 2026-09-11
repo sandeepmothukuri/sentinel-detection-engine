@@ -5,7 +5,11 @@
 *Source: `docs/diagrams/ci-cd/01-validation-pipeline.mmd`.*
 
 
-This repository separates **what CI can prove** from **what only a live tenant can prove**, and labels every rule accordingly.
+This repository separates **what CI can prove** from **what only a live tenant can prove**, and labels
+every rule accordingly. `scripts/ci_validate.py` is the core of the first half: 18 checks in 9
+families, every failure reported as a GitHub annotation naming the file, the field and the
+expectation. [`tests/test_documented_numbers.py`](../tests/test_documented_numbers.py) fails the
+build if that total and the one quoted in the README stop agreeing.
 
 ## Validation status vocabulary
 
@@ -27,10 +31,11 @@ This repository separates **what CI can prove** from **what only a live tenant c
 | ATT&CK | `scripts/ci_validate.py` + vendored `scripts/attack_data.json` (MITRE CTI, 697 techniques; revoked/deprecated excluded) | Technique ids exist and tactics are consistent |
 | Telemetry | `scripts/ci_validate.py` (`TABLE_CATALOG`) | Every table the query reads is produced by a declared connector/dataType |
 | KQL lint | `scripts/kql_lint.py` | Bracket/quote balance (string-aware), invalid set operators, `matches regex`/`extract()` regex validity, no `now()` in scheduled rules |
-| Python tests | `pytest tests/` (148 tests) | Regressions: parameter parsing patterns, uniqueness, honest validation statuses, JSON artifacts parse |
+| Python tests | `pytest tests/` (156 tests) | Regressions: parameter parsing patterns, uniqueness, honest validation statuses, JSON artifacts parse, the declared toolchain matches what the gates import |
 | Coverage drift | `validate.yml` | `coverage.md` + Navigator layer regenerate byte-identical |
 | ARM drift | `validate.yml` | `deploy/` regenerates byte-identical from the rule files |
 | Preview digest | `scripts/render_design_preview.py --check` | The committed workbook preview matches the digest of the workbook definition it was drawn from |
+| Chart data + digest | `scripts/render_project_charts.py --check` | Every chart is redrawn in memory; the numbers it would print must equal the recorded ones in `docs/images/generated-charts.json`, and each committed PNG must match its recorded SHA-256 |
 | Quality matrix | `validate.yml` | `docs/metrics-matrix.md` regenerates byte-identical from the rule files and the ledger |
 | Links | `scripts/check_links.py` | No broken relative markdown links |
 | Secrets | gitleaks | Nothing credential-shaped is committed |
@@ -46,10 +51,11 @@ This repository separates **what CI can prove** from **what only a live tenant c
 | `tests/test_evidence.py` | 15 | Evidence hygiene for images: no committed image carries EXIF or PNG metadata, every `Screenshot` entry records an environment, date and redaction statement, lab captures follow the naming convention, and an unfilled `Demonstrates` line fails the build |
 | `tests/test_sigma_converter.py` | 7 | Sigma translation, including that a prefix match is never silently widened into a substring match |
 | `tests/test_arm_templates.py` | 16 | The deployable artefact: `deploy/` matches the rule files, every emitted property is a real alert-rule property, the resource name uses the committed rule id, and the converter refuses timespans and trigger operators it does not understand |
-| `tests/test_diagrams.py` | 8 | Everything drawn or registered about the content: numbers printed inside diagram sources, the architecture table-to-connector mapping, the workbook wireframe's panel parity, the absence of invented values in that wireframe, and a register entry in `docs/evidence.md` for every committed image |
-| `tests/test_documented_numbers.py` | 9 | The numbers themselves: rule, hunt, ledger, image and test totals; the README telemetry table and the deployment connector table; the workbook panel count; and the freshness of the generated quality matrix |
+| `tests/test_diagrams.py` | 11 | Everything drawn or registered about the content: numbers printed inside diagram sources, the architecture table-to-connector mapping, the workbook wireframe's panel parity, the absence of invented values in that wireframe, a register entry in `docs/evidence.md` for every committed image, the chart gates actually running in CI, and the social preview card agreeing with the rule files |
+| `tests/test_requirements.py` | 3 | The CI toolchain: every third-party import in `scripts/` and `tests/` is declared in `requirements.txt`, the workflows install from that file and not from a hand-typed list, and every declared library is importable |
+| `tests/test_documented_numbers.py` | 11 | The numbers themselves: rule, hunt, ledger, image and test totals; the README telemetry table and the deployment connector table; the workbook panel count; and the freshness of the generated quality matrix |
 
-`python -m pytest tests -q` runs all of them offline in under four seconds.
+`python -m pytest tests -q` runs all of them offline in under ten seconds.
 [`tests/test_documented_numbers.py`](../tests/test_documented_numbers.py) fails the build if this
 count, the tests in it, or the rule, hunt and ledger totals quoted in this file and the README stop
 matching the repository.

@@ -12,22 +12,27 @@ replacing an image.
 
 ```
 docs/images/
-├── architecture/   logical architecture, telemetry-to-detection flow
-├── sentinel/       connector, table and rule coverage
-├── detections/     rule development lifecycle, rule anatomy and its validation gates
+├── architecture/   logical architecture, telemetry-to-detection flow, deployment paths
+├── sentinel/       connector/table coverage, evidence-and-validation model, validation status chart
+├── detections/     rule development lifecycle, rule anatomy, tuning loop, inventory chart
 ├── hunting/        hunt-to-detection workflow
-├── soar/           SOAR decision flow and its mandatory safety gates
+├── soar/           SOAR decision flow and safety gates, IR lifecycle
 ├── workbooks/      L3 triage dashboard design preview
-├── attack/         ATT&CK coverage chart, ATT&CK Navigator export
-└── ci-cd/          validation pipeline, release and pull-request automation
+├── attack/         ATT&CK coverage chart, v19 domain change, coverage depth, Navigator export
+├── ci-cd/          validation pipeline, release and pull-request automation
+└── social/         GitHub social preview card, drawn from the repository's own counts
 ```
+
+21 images in total: 14 Mermaid diagrams, 5 generated charts, 1 workbook design preview and 1
+screenshot (the ATT&CK Navigator export). There is no AI-generated imagery and no mockup of a
+system that does not exist.
 
 ## The three provenance classes
 
 | Class | What it is | How it is produced | How a reader can tell |
 |---|---|---|---|
 | **Diagram** | Original flowchart or chart authored in this repository | `docs/diagrams/*.mmd` rendered by `scripts/render_diagrams.py`, or drawn by `scripts/render_design_preview.py` / `scripts/render_coverage_chart.py` | Filename pairs with a source file; `docs/evidence.md` names the generator |
-| **Generated chart** | Bar/line chart of numbers taken from repository artefacts | script reads `attack-navigator/layer.json` or the rule files | Numbers on the image are reproducible by re-running the generator |
+| **Generated chart** | Bar/line chart of numbers taken from repository artefacts | `scripts/render_coverage_chart.py` or `scripts/render_project_charts.py`, reading `attack-navigator/layer.json`, the rule files, the hunting queries and the validation ledger | Numbers on the image are reproducible by re-running the generator; `docs/images/generated-charts.json` records every value each chart drew, and CI fails if a redraw disagrees |
 | **Screenshot** | Capture of the author's environment | manual capture | Described in `docs/evidence.md` with environment and redactions |
 
 ## Rules for adding an image
@@ -57,13 +62,19 @@ docs/images/
 ## Regenerating
 
 ```bash
-python scripts/render_diagrams.py           # Mermaid diagrams (needs network: renders via mermaid.ink)
-python scripts/render_diagrams.py --check   # fail if a PNG is older than its .mmd source
-python scripts/render_design_preview.py     # workbook design preview, no network needed
-python scripts/render_coverage_chart.py     # ATT&CK coverage chart, no network needed
+python scripts/render_diagrams.py                   # Mermaid diagrams (needs network: renders via mermaid.ink)
+python scripts/render_diagrams.py --check           # fail if a PNG is older than its .mmd source
+python scripts/render_diagrams.py --only attack/04  # re-render one diagram after editing it
+python scripts/render_design_preview.py             # workbook design preview, no network needed
+python scripts/render_coverage_chart.py             # ATT&CK coverage chart, no network needed
+python scripts/render_project_charts.py             # charts + the social preview card, no network needed
+python scripts/render_project_charts.py --check     # CI gate: recompute the numbers, then compare digests
 ```
 
 `render_diagrams.py` is intentionally not part of CI: CI must not depend on a third-party
 rendering service being reachable. The committed PNGs are what CI and GitHub render, and
-`--check` is available locally to catch a stale image before review. The two offline generators
-are deterministic and are checked in CI by comparing their output digest.
+`--check` is available locally to catch a stale image before review. The three offline generators
+are deterministic and are checked in CI: the design preview and the coverage chart by digest, and
+`render_project_charts.py` by recomputing every value it would print — so a rule added without
+redrawing the charts fails the build, while a different matplotlib release does not, because the
+comparison is on the numbers and not on the rendered bytes.

@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 from collections import Counter
 
 import yaml
@@ -155,3 +157,48 @@ def test_diagram_says_how_the_counts_are_kept_honest():
     text = DIAGRAM.read_text(encoding="utf-8")
     assert "rule files" in text, (
         "the diagram must state where its counts come from, so a reader knows they are not decorative")
+
+
+# ------------------------------------------------------------------ charts
+CHART_GENERATOR = REPO / "scripts" / "render_project_charts.py"
+VALIDATE_WORKFLOW = REPO / ".github" / "workflows" / "validate.yml"
+
+
+def test_generated_charts_match_their_recorded_numbers_and_digest():
+    """The charts are pictures of counts. If a rule or a ledger entry changes and the
+    charts are not redrawn, the pictures keep asserting the old numbers — and unlike
+    prose, nobody greps a PNG. The generator redraws in memory and compares the
+    numbers against docs/images/generated-charts.json, then checks each committed
+    PNG against its digest."""
+    assert CHART_GENERATOR.exists(), "scripts/render_project_charts.py is missing"
+    proc = subprocess.run([sys.executable, str(CHART_GENERATOR), "--check"],
+                          capture_output=True, text=True, cwd=REPO)
+    assert proc.returncode == 0, (
+        "the generated charts no longer match the repository data.\n"
+        f"{proc.stdout}{proc.stderr}\n"
+        "Re-run scripts/render_project_charts.py and commit the images and "
+        "docs/images/generated-charts.json."
+    )
+
+
+def test_the_chart_gate_runs_in_ci():
+    workflow = VALIDATE_WORKFLOW.read_text(encoding="utf-8")
+    assert "render_project_charts.py --check" in workflow, (
+        "the chart drift gate is not invoked by .github/workflows/validate.yml, so the "
+        "repository would ship charts nobody verifies"
+    )
+
+
+def test_the_social_card_states_the_same_numbers_as_the_rule_files():
+    """The card is the first thing a reader sees on GitHub. Its stat row is derived at
+    draw time, but the numbers are also in the README and the coverage document, and a
+    preview image that contradicts them is worse than no preview image."""
+    manifest = json.loads((REPO / "docs" / "images" / "generated-charts.json").read_text(
+        encoding="utf-8"))["images"]
+    card = manifest["social/preview-card.png"]["data"]
+    rules = len(list((REPO / "Detections").glob("*.yaml")))
+    hunts = len(list((REPO / "Hunting Queries").glob("*.yaml")))
+    layer = json.loads((REPO / "attack-navigator" / "layer.json").read_text(encoding="utf-8"))
+    assert card["rules"] == rules
+    assert card["hunting_queries"] == hunts
+    assert card["attack_techniques"] == len(layer["techniques"])

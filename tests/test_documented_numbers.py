@@ -214,3 +214,69 @@ def test_documents_do_not_carry_stale_counts():
     # Word boundaries: "24 tests" must not match inside "124 tests".
     found = [s for s in stale if re.search(rf"(?<![0-9]){re.escape(s)}", text)]
     assert not found, f"stale counts still documented: {found}"
+
+
+# ------------------------------------------------------- validator check counts
+VALIDATOR = REPO / "scripts" / "ci_validate.py"
+
+
+def validator_check_numbers() -> set[int]:
+    """The numbered checks in the validator's own docstring — the list the README
+    describes. Read from the docstring rather than from a constant so that adding a
+    check to the code and the documentation together is what changes the number."""
+    import ast
+
+    doc = ast.get_docstring(ast.parse(VALIDATOR.read_text(encoding="utf-8"))) or ""
+    return {int(m) for m in re.findall(r"^\s+(\d+)\.\s+\S", doc, flags=re.MULTILINE)}
+
+
+def validator_family_names() -> set[str]:
+    """The section headings that group those checks (Schema, KQL, …).
+
+    A heading is a column-zero line whose next non-blank line is an indented,
+    numbered check. Matching on that shape rather than on "any capitalised line"
+    keeps the docstring's trailing prose line out of the count.
+    """
+    import ast
+
+    doc = ast.get_docstring(ast.parse(VALIDATOR.read_text(encoding="utf-8"))) or ""
+    lines = doc.splitlines()
+    headings = set()
+    for index, line in enumerate(lines):
+        if not line or line[0].isspace() or line.startswith("-"):
+            continue
+        following = next((l for l in lines[index + 1:] if l.strip()), "")
+        if re.match(r"^\s+\d+\.\s+\S", following):
+            headings.add(line.strip())
+    return headings
+
+
+def test_validator_check_count_is_continuous_and_documented():
+    """The README claimed "15 check families" while the validator's docstring listed
+    numbered checks running to 18, and nothing compared the two. This is that
+    comparison: the numbering has to be a gapless 1..N, and N has to appear in the
+    README and in docs/testing.md as the number of checks."""
+    numbers = validator_check_numbers()
+    assert numbers, "scripts/ci_validate.py no longer documents its checks"
+    expected = set(range(1, max(numbers) + 1))
+    assert numbers == expected, (
+        f"the documented check numbers in scripts/ci_validate.py are not a gapless "
+        f"1..{max(numbers)}: missing {sorted(expected - numbers)}")
+    total = max(numbers)
+    families = len(validator_family_names())
+    for document in (README, TESTING_DOC):
+        text = document.read_text(encoding="utf-8")
+        assert f"{total} checks" in text or f"{total}-check" in text, (
+            f"{document.name} does not state the validator's real check total ({total})")
+    readme = README.read_text(encoding="utf-8")
+    assert f"{total} checks in {families} families" in readme, (
+        f"README does not state the validator as {total} checks in {families} families")
+
+
+def test_readme_does_not_repeat_a_retired_gate_count():
+    """The specific defect this file was extended for: a family count that was never
+    reconciled with the checks it supposedly grouped."""
+    text = README.read_text(encoding="utf-8")
+    assert "15 check families" not in text, (
+        "README still quotes the retired '15 check families' figure; the validator's "
+        "docstring is the source of truth")
