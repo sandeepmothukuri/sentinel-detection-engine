@@ -73,6 +73,20 @@ def test_readme_and_testing_doc_state_the_real_test_total():
     assert f"`pytest tests/` ({total} tests)" in testing, (
         f"docs/testing.md does not state the real test total ({total})")
 
+    # The README also breaks the total down per module, and that row said "196
+    # tests" for one release while the modules underneath it summed to 201: the
+    # check above only asks whether the total appears somewhere in the file. The
+    # breakdown is now held to arithmetic instead — the stated total must be the
+    # real one, and the module counts must add up to it.
+    row = next((line for line in readme.splitlines() if line.startswith("| `pytest` |")), None)
+    assert row, "README has no `pytest` row to check the per-module breakdown in"
+    numbers = [int(n) for n in re.findall(r"\b(\d+)\b", row)]
+    assert numbers[0] == total, (
+        f"the README test row opens with {numbers[0]} tests; the suite collects {total}")
+    assert sum(numbers[1:]) == total, (
+        f"the README test row lists {numbers[1:]}, which sum to {sum(numbers[1:])} rather than "
+        f"the {total} tests the suite collects")
+
 
 def test_every_test_module_is_documented_with_its_real_count():
     """Each module needs a row in docs/testing.md, and the row must be right."""

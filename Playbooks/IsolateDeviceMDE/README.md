@@ -26,6 +26,11 @@ az deployment group create \
 
 Bind to incidents via Sentinel **Automation rule**: trigger = `Incident created`, condition = `Analytic rule name contains MDE_`, action = run this playbook.
 
+Deployment parameters: `IsolationType` (`Selective`), `MinimumSeverity` (`High`),
+`ExcludedDeviceNames` (empty by default) and the connection names — `SentinelConnectionName`
+(`azuresentinel`) and `MDEConnectionName` (`wdatp`, the name the Defender XDR connector creates).
+A connection-name mismatch fails at the isolate call rather than at deployment.
+
 ## Reversal
 
 `Unisolate` the device from MDE portal → Device → Actions → **Release from isolation**, or run the inverse Graph API call. Always document reversal in the incident comment.

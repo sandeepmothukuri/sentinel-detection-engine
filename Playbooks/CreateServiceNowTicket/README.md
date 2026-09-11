@@ -25,6 +25,11 @@ az deployment group create \
 
 You can pull the assignment group sys_id from ServiceNow: `/api/now/table/sys_user_group?sysparm_query=name=SecOps&sysparm_fields=sys_id`.
 
+Deployment parameters: `AssignmentGroupSysId` and `ServiceNowInstanceUrl` (both required, no
+defaults — the deploy example above passes them), plus the connection names `ServiceNowConnectionName`
+(`service-now`) and `SentinelConnectionName` (`azuresentinel`). This playbook takes no severity floor:
+it only opens a ticket, and the automation rule bound to it decides which severities reach it.
+
 ## Bind via automation rule
 
 Sentinel → Automation → New rule:

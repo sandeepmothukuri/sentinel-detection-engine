@@ -24,6 +24,12 @@ az deployment group create \
                PrivilegedUserPrincipals='["admin1@contoso.com","admin2@contoso.com"]'
 ```
 
+The template also takes connection-name parameters, every one of them defaulting to the connection
+listed above: `SentinelConnectionName` (`azuresentinel`), `AADConnectionName` (`azuread`),
+`VTConnectionName` (`virustotal`) and `AbuseIPDBConnectionName` (`abuseipdb`). Change one only if you
+created that API connection under a different name — a mismatch fails at the connector call, not at
+deployment, so it is worth reading the names back after a deploy.
+
 Then bind it to incidents via an **automation rule** in Sentinel (Sentinel → Automation → Create automation rule → "Run playbook").
 
 ## Why a confidence threshold and not full-auto disable

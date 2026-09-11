@@ -31,6 +31,10 @@ az deployment group create \
                MinimumSeverity=High
 ```
 
+Deployment parameters: `MinimumSeverity` (`High`), `AllowlistedIPs` (empty), `MaxIPGroupEntries`
+(1000), `IpGroupResourceId` — the IP Group this playbook writes to, shown in the example above — and
+`SentinelConnectionName` (`azuresentinel`).
+
 ## Safeguards (v1.1)
 
 - **Severity floor** — `MinimumSeverity` (default `High`). Adding an address to a firewall deny list is a destructive action like the other two playbooks, so it is gated the same way: incidents *at or above* the floor may push a block, anything below gets a comment. Comparison is by severity rank, so a floor of `Medium` still acts on `High`.
