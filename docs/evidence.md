@@ -8,7 +8,7 @@ was redacted. It exists because a detection-engineering repository should be abl
 
 | Field | Meaning |
 |---|---|
-| **Provenance class** | *Diagram* (original Mermaid source in this repository), *Generated chart* (drawn by a script from repository data), or *Screenshot* (captured from the author's own environment) |
+| **Provenance class** | *Diagram* (original Mermaid source in this repository), *Generated chart* (drawn by a script from repository data), *Design preview* (a rendering of a committed definition, carrying illustrative sample values), or *Screenshot* (captured from the author's own environment) |
 | **Source** | The file that generates it, or the system that was captured |
 | **Environment** | What had to exist for the image to be produced |
 | **Date** | When the artefact was produced or last regenerated |
@@ -251,6 +251,34 @@ secrets. The script removes what is attached to the file, not what is on the scr
   exist has no place in an evidence register. The replacement above is generated from the
   workbook definition and contains no numbers at all.
 
+### `workbooks/02-dashboard-sample-data-illustration.png`
+- **Provenance class:** Design preview (illustrative sample data)
+- **Source:** Static render of the panel layout defined in `Workbooks/L3-Triage-Dashboard.json`,
+  filed from the author's workstation on 2026-09-11 and re-encoded on intake to strip file metadata.
+- **Environment:** None. No Sentinel workspace, connector or tenant was involved in producing it:
+  it is a drawing of a workbook definition. It is **not** a capture of any tenant.
+- **Date:** 2026-09-11
+- **Demonstrates:** What the 13-panel workbook is intended to look like when it is deployed and
+  carrying data — panel placement, the KPI strip, the severity donut, the top-firing-detections
+  bar, the ATT&CK heatmap, the entity table and the active-incident queue. It demonstrates layout
+  intent and nothing else.
+- **What the values on it are:** **Illustrative. All of them.** The incident counts (7 / 14 / 23),
+  the MTTA of 9 minutes, the MTTR of 42 minutes, the incident ids `INC-1033`–`INC-1042`, the
+  account names, the host names and the IP addresses are invented samples chosen to show the shape
+  of the panel. They are not measurements, not results, and not evidence. The image carries both
+  disclaimers itself — *"Preview mockup — this is a static HTML render … intended as a visual
+  reference"* across the top and *"Sample data shown is illustrative"* at the foot — and this entry
+  exists so that no reader has to take that on trust.
+- **What it must never be cited as:** evidence that any detection fired, that any incident exists,
+  or that any metric has been measured. Every measurement in this repository reads
+  `Not yet measured` and [`production-readiness.md`](production-readiness.md) scores operational
+  validation at the floor. The data-free wireframe
+  (`workbooks/01-triage-dashboard-design-preview.png`) is the version to show when the reader needs
+  to see the layout without any number beside it.
+- **Redactions:** None required — every value is synthetic by construction. The workspace label
+  reads `sentinel-prod`, which is a placeholder for "the workspace name you deploy to", not a
+  workspace that exists.
+
 ## attack
 
 *Numbering note: there is no `attack/02`. The Navigator export was renumbered to `03` when it moved
@@ -427,4 +455,6 @@ right and the file is stale.
 
 Screenshot provenance cannot be re-derived from the repository. That is exactly why it is
 recorded here in prose, with its environment and date, instead of being left for the reader to
-guess at.
+guess at. The same applies to the design preview at `workbooks/02`: its *layout* is reproducible
+from `Workbooks/L3-Triage-Dashboard.json`, but the sample values drawn into it are not derived
+from anything, which is why the entry above enumerates them and says so.

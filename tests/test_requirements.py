@@ -40,6 +40,10 @@ def import_name_of(distribution: str) -> str:
     return {"pyyaml": "yaml", "pillow": "PIL"}.get(distribution, distribution)
 
 
+# Distributions that deliver an executable rather than an importable module.
+BINARY_PROVIDERS = {"actionlint-py": "actionlint"}
+
+
 def third_party_imports(directory: pathlib.Path) -> dict[str, set[str]]:
     found: dict[str, set[str]] = {}
     for path in sorted(directory.rglob("*.py")):
@@ -85,7 +89,14 @@ def test_every_imported_library_is_actually_installed_here() -> None:
     """If a library is declared but not importable in this environment, the suite is
     not exercising what CI will exercise."""
     import importlib
+    import shutil
 
-    unavailable = [import_name_of(name) for name in declared()
-                   if importlib.util.find_spec(import_name_of(name)) is None]
-    assert not unavailable, f"declared in requirements.txt but not importable: {unavailable}"
+    unavailable = []
+    for name in declared():
+        binary = BINARY_PROVIDERS.get(name)
+        if binary:
+            if not (shutil.which(binary) or shutil.which(f"{binary}.exe")):
+                unavailable.append(f"{name} (provides the `{binary}` executable, not on PATH)")
+        elif importlib.util.find_spec(import_name_of(name)) is None:
+            unavailable.append(import_name_of(name))
+    assert not unavailable, f"declared in requirements.txt but not usable: {unavailable}"

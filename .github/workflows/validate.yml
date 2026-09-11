@@ -4,10 +4,15 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_call:      # reused as the release gate so the two can never diverge
-    secrets:
-      GITHUB_TOKEN:
-        required: false
+  # Reused as the release gate so the two can never diverge.
+  # DO NOT declare secrets here. Naming GITHUB_TOKEN in workflow_call.secrets makes
+  # GitHub reject the entire workflow file ("would collide with system reserved
+  # name"), which fails every run at startup with zero jobs — push, pull request and
+  # the Dependabot PRs alike. It did exactly that on 2026-09-11. The token is taken
+  # from the github.token context below instead, which is defined in every trigger,
+  # including when this workflow is called by release.yml with `secrets: inherit`.
+  # tests/test_workflows.py fails the build if a reserved secret name reappears here.
+  workflow_call:
 
 # Least privilege: this workflow reads the repository and uploads an artefact.
 # It never writes to the repository, so no job is granted write scope.
@@ -47,7 +52,9 @@ jobs:
       - name: Secrets scan
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.9
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # github.token, not secrets.GITHUB_TOKEN: identical value, but defined in
+          # every trigger context including workflow_call.
+          GITHUB_TOKEN: ${{ github.token }}
         # A secret in a detection repository is an incident, not a warning.
         # continue-on-error is deliberately absent.
 
@@ -62,6 +69,12 @@ jobs:
 
       - name: Python test suite
         run: python -m pytest tests -v
+
+      - name: Lint the workflow files
+        # Catches the class of defect that is invisible locally and fatal in CI: bad
+        # expressions, mistyped action inputs, shell errors. Added after a workflow
+        # file was rejected by GitHub at startup and every run failed with zero jobs.
+        run: actionlint -color
 
       - name: Markdown link check
         run: python scripts/check_links.py

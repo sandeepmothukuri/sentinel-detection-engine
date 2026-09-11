@@ -16,3 +16,8 @@ yamllint>=1.35,<2
 pytest>=8.0,<9
 matplotlib>=3.8,<4
 Pillow>=10.0
+# Bundles the actionlint binary (a Go program, no importable module — hence the
+# entry in test_requirements.py's BINARY_PROVIDERS). Pinned exactly because the
+# delivered artefact is a compiled binary, not a library: a range would silently
+# swap the linter between local runs and CI.
+actionlint-py==1.7.12.24

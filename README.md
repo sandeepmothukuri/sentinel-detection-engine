@@ -6,13 +6,26 @@ triage workbook, generated ATT&CK coverage, a validation ledger that cites real 
 tests, and the full L3 SOC workflow documentation to go with them.
 
 [![validate](https://github.com/sandeepmothukuri/sentinel-detection-engine/actions/workflows/validate.yml/badge.svg)](https://github.com/sandeepmothukuri/sentinel-detection-engine/actions/workflows/validate.yml)
+[![release](https://github.com/sandeepmothukuri/sentinel-detection-engine/actions/workflows/release.yml/badge.svg)](https://github.com/sandeepmothukuri/sentinel-detection-engine/actions/workflows/release.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> **Validation status: nothing in this repository has been executed against a live tenant.**
-> Every rule is at `STATIC VALIDATION` — it passes schema, KQL lint, ATT&CK coherence,
-> telemetry-to-connector parity and metadata checks in CI, and that is all. No incident numbers,
-> detection rates, MTTA/MTTR figures or screenshots of a live workspace appear anywhere in this
-> repository, because none exist. See [validation](#11-validation-methodology) and
+> **Validation status — read this first.** Nothing in this repository has been executed against a
+> live tenant. Every rule is at `STATIC VALIDATION`: it passes schema, KQL lint, ATT&CK coherence,
+> telemetry-to-connector parity and metadata checks in CI, and that is all. No incident numbers, no
+> detection rates, no MTTA/MTTR figures and no screenshots of a live workspace appear anywhere in
+> this repository, because none exist. Where a measurement would go, the repository says
+> `Not yet measured`. See [§11 Validation methodology](#11-validation-methodology) and
 > [`tests/atomics.md`](tests/atomics.md).
+
+**Contents** · [1 Overview](#1-overview) · [2 Why](#2-why-this-exists) · [3 Architecture](#3-architecture) ·
+[4 Detections](#4-detection-inventory) · [5 Hunting](#5-hunting-inventory) · [6 ATT&CK](#6-attck-coverage) ·
+[7 Telemetry](#7-telemetry) · [8 SOAR](#8-soar) · [9 CI/CD](#9-cicd) · [10 Testing](#10-testing) ·
+[11 Validation](#11-validation-methodology) · [12 Deployment](#12-deployment) ·
+[13 Images](#13-screenshots-and-diagrams) · [14 Metrics](#14-metrics) · [15 Limitations](#15-limitations) ·
+[16 Roadmap](#16-roadmap) · [17 Author](#17-author) · [18 License](#18-license)
+
+**Jump to** · [Quick start](#12-deployment) · [Repository layout](#repository-layout) ·
+[Documentation index](#documentation-index) · [How to verify this repository yourself](#how-to-verify-this-repository-yourself)
 
 ---
 
@@ -27,8 +40,59 @@ tests, and the full L3 SOC workflow documentation to go with them.
 | **Reporting** | L3 triage workbook (13 panels), generated ATT&CK coverage, static HTML dashboard preview |
 | **ATT&CK coverage** | 37 unique techniques across 12 of the 14 enterprise tactics |
 | **Validation** | 28 ledger entries; 31 cited atomic test references verified to exist upstream; 14 rules with a written manual procedure where no atomic can exercise them |
-| **Quality gates** | 18 checks in 9 families in `scripts/ci_validate.py`, 156 tests, 6 CI drift gates, secret scanning, SHA-pinned actions |
+| **Quality gates** | 18 checks in 9 families in `scripts/ci_validate.py`, 163 tests, 6 CI drift gates, secret scanning, SHA-pinned actions |
 | **Author** | Sandeep Mothukuri |
+
+## Repository layout
+
+```
+sentinel-detection-engine/
+├── Detections/             18 scheduled analytics rules — the detection content
+├── Hunting Queries/        10 hypothesis-driven KQL hunts
+├── Playbooks/              4 Logic App playbooks, exported as ARM
+├── Workbooks/              L3 triage dashboard definition (13 panels)
+├── deploy/                 28 ARM templates generated from the rule files
+├── attack-navigator/       ATT&CK Navigator layer, generated
+├── coverage.md             generated coverage report
+├── tests/                  163 tests, plus the validation ledger and the evidence templates
+├── scripts/                18 tools: validator, generators, renderers, intake
+├── docs/                   26 documents: architecture through to the IR runbook
+└── .github/workflows/      validate, release and pull-request automation
+```
+
+## Documentation index
+
+| Document | What it answers |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | How telemetry becomes a detection, and what the component boundaries are |
+| [`docs/deployment.md`](docs/deployment.md) | Which portal, which deployment path, and what each one requires |
+| [`docs/detection-development.md`](docs/detection-development.md) | The lifecycle a rule follows from hypothesis to measurement |
+| [`docs/testing.md`](docs/testing.md) | What CI proves, what it cannot, and every test module |
+| [`tests/validation/live-validation-guide.md`](tests/validation/live-validation-guide.md) | The procedure that would move a rule off `STATIC VALIDATION`, in order, with the safety constraints |
+| [`docs/metrics.md`](docs/metrics.md) · [`docs/metrics-matrix.md`](docs/metrics-matrix.md) | The measurement framework, and its per-rule status |
+| [`docs/tuning.md`](docs/tuning.md) | What happens after an alert, including how a rule is retired |
+| [`docs/triage.md`](docs/triage.md) · [`docs/SOAR.md`](docs/SOAR.md) | Analyst workflow, and the automation safety gates |
+| [`docs/ATTACK.md`](docs/ATTACK.md) · [`coverage.md`](coverage.md) | The mapping discipline, and the generated coverage |
+| [`docs/data-sources.md`](docs/data-sources.md) | Connectors, tables, and the rules that depend on them |
+| [`docs/troubleshooting.md`](docs/troubleshooting.md) | Every CI failure and connector symptom, with the fix |
+| [`docs/evidence.md`](docs/evidence.md) | Provenance for every image, including what is deliberately absent |
+| [`docs/production-readiness.md`](docs/production-readiness.md) · [`docs/limitations.md`](docs/limitations.md) | Honest scores against readiness dimensions, and the nine structural limits |
+| [`docs/workflows/`](docs/workflows/) | IR runbook, triage SOP, escalation matrix, SOAR decision flow, tuning log, maturity assessment |
+| [`tests/atomics.md`](tests/atomics.md) · [`tests/validation/validation-schema.yaml`](tests/validation/validation-schema.yaml) | The validation ledger as rendered, and the schema every entry must satisfy |
+
+## How to verify this repository yourself
+
+```bash
+pip install -r requirements.txt          # the toolchain CI uses, declared once
+python -m pytest tests -q                # 163 tests, offline, under ten seconds
+python scripts/ci_validate.py            # 18 checks over every rule and hunt
+python scripts/generate_coverage.py && git diff --exit-code   # generated artefacts are reproducible
+python scripts/render_project_charts.py --check               # every chart still matches its numbers
+```
+
+Every number in this README is derived from the repository by
+[`tests/test_documented_numbers.py`](tests/test_documented_numbers.py); if a count here stops
+matching the files, the build fails rather than the reader finding out.
 
 ## 2. Why this exists
 
@@ -172,7 +236,8 @@ Every push and pull request runs:
 | `gitleaks` | Any committed secret. Never disabled, never `continue-on-error`. |
 | `yamllint` | Malformed rule, hunt and workflow YAML |
 | `scripts/ci_validate.py` | 18 checks in 9 families: **schema** (required fields, UUID and name uniqueness, severity and status vocabulary, `kind`) · **scheduling** (`queryFrequency` and `queryPeriod` bounds, frequency ≤ period) · **ATT&CK** (technique ids exist in the vendored MITRE matrix, tactics cohere) · **telemetry** (every table the query reads is produced by a declared connector) · **entity mapping** (identifiers are real and the columns exist) · **alert details** (placeholders reference columns the query returns) · **metadata** (the production bar: `validationStatus`, `falsePositives`, `tuningGuidance`, `suppression`) · **KQL** (lint, explicit `ago()` bound, `TimeGenerated` retained by the final projection) · **validation ledger** (one entry per rule and vice versa, closed status vocabulary, citations that resolve upstream, a trigger atomic or a manual procedure) |
-| `pytest` | 156 tests in ten modules: 28 rule tests, 33 negative tests that prove the validator rejects bad input, 23 ledger tests, 16 tests of the generated deployment templates, 15 tests of image evidence hygiene, 11 tests of everything drawn or registered (diagram counts, the chart gates, the workbook wireframe, the register), 9 backtesting-contract tests, 7 Sigma converter tests, 11 tests that fail if a documented number drifts, including the validator's own check total, and 3 tests that keep the CI toolchain and `requirements.txt` from diverging |
+| `pytest` | 163 tests in eleven modules: 28 rule tests, 33 negative tests that prove the validator rejects bad input, 23 ledger tests, 16 tests of the generated deployment templates, 15 tests of image evidence hygiene, 11 tests of everything drawn or registered (diagram counts, the chart gates, the workbook wireframe, the register), 9 backtesting-contract tests, 7 tests of the workflow files GitHub will accept, 7 Sigma converter tests, 11 tests that fail if a documented number drifts, including the validator's own check total, and 3 tests that keep the CI toolchain and `requirements.txt` from diverging |
+| `actionlint` | The workflow files themselves: expressions, action inputs, shell. Installed from `requirements.txt` and run as its own CI step, because a workflow GitHub refuses to start fails every job with zero jobs and no output |
 | `scripts/check_links.py` | Broken relative links in documentation |
 | Drift ×6 | `coverage.md` + `attack-navigator/layer.json`, `tests/atomics.md`, `deploy/`, `docs/metrics-matrix.md`, the workbook preview digest and the generated charts must match what the generators produce. The chart gate compares the numbers it would draw, then the digests — re-rasterising a chart is not a repository change |
 | `scripts/generate_arm_templates.py` | Regenerates `deploy/` — the ARM templates a Sentinel Repositories connection actually consumes — from the rule files |
@@ -189,7 +254,7 @@ its gate before publishing a signed-checksum archive.
 
 ## 10. Testing
 
-156 tests, no network access required, under ten seconds.
+163 tests, no network access required, under ten seconds.
 
 | Suite | What it covers |
 |---|---|
@@ -258,11 +323,13 @@ executed, and the gates that have to pass first.
 
 ## 13. Screenshots and diagrams
 
-The repository contains 21 images: **20 generated from source in this repository and 1 real
-screenshot** — the ATT&CK Navigator rendering the committed layer. That is 14 Mermaid diagrams,
-5 charts drawn from committed repository data, and 1 workbook design preview. **No image shows a
-live Microsoft Sentinel tenant, and none contains invented incident numbers, alert counts, user
-names or hostnames.**
+The repository contains 22 images: **20 generated from source in this repository, 1 design
+preview carrying illustrative sample values, and 1 real screenshot** — the ATT&CK Navigator
+rendering the committed layer. That is 14 Mermaid diagrams, 5 charts drawn from committed
+repository data, 1 data-free workbook wireframe and 1 labelled sample-data workbook preview.
+**No image shows a live Microsoft Sentinel tenant.** The only image containing invented incident
+numbers or entities is `workbooks/02`, which says so in its own pixels and is enumerated line by
+line in [`docs/evidence.md`](docs/evidence.md); every other image contains no measurement at all.
 
 Captures of a live workspace cannot be produced by a repository, and an invented one would be a
 fabrication. So the images that would prove the most — a deployed rule list, an incident the pack
@@ -276,13 +343,14 @@ build if the entry lacks an environment, a date, a redaction statement or a comp
 |---|---|
 | Architecture (logical, telemetry flow, deployment paths), connector coverage, evidence model, rule lifecycle, rule anatomy, tuning loop, hunt workflow, SOAR safety gate, IR lifecycle, CI pipelines, the v19 domain change | 14 diagrams generated from Mermaid source in `docs/diagrams/`. The `.mmd` file is the source of truth; the PNG is an export |
 | ATT&CK coverage chart, coverage depth, detection inventory, validation status, GitHub social preview card | 5 charts drawn at build time by `scripts/render_project_charts.py` and `scripts/render_coverage_chart.py` from `attack-navigator/layer.json`, the rule files, the hunting queries and `tests/validation/atomics.yaml`. Every number on every chart is recomputed and compared in CI; no chart carries a hand-typed value |
-| L3 workbook design preview | Drawing generated from the workbook definition, carrying the banner *"Design preview — requires deployment to display live telemetry"* and showing `—` where values would appear |
+| L3 workbook wireframe, data-free | Drawing generated from the workbook definition, carrying the banner *"Design preview — requires deployment to display live telemetry"* and showing `—` where values would appear. This is the one to show when the layout is the point |
+| L3 workbook sample-data illustration | The same 13 panels with **illustrative** sample values, so the layout can be seen at realistic scale. The incidents, counts, MTTA and MTTR on it are invented samples; the image says so across its top and its foot, and `docs/evidence.md` lists every value. It is layout intent, never evidence of a detection |
 | ATT&CK Navigator export | Screenshot of the committed layer rendered in Navigator on the author's workstation |
 
 Every image's purpose, source, environment, date, what it demonstrates and what was redacted is
 recorded in [`docs/evidence.md`](docs/evidence.md). There is intentionally no screenshot of an
-analytics-rule blade, an incident queue or a workbook with data: producing one honestly would
-require a live workspace, and there is not one.
+analytics-rule blade, an incident queue, or the workbook rendering **real** telemetry: producing
+one honestly would require a live workspace, and there is not one.
 
 ![Rule anatomy and its gates](docs/images/detections/02-analytics-rule-anatomy.png)
 
@@ -338,7 +406,7 @@ out in [`docs/limitations.md`](docs/limitations.md).
 ## 16. Roadmap
 
 **Completed** — the rule pack with its metadata bar; hunting queries with full hunt metadata; four
-playbooks with safety gates; 18-check CI validator; 156-test suite including negative tests;
+playbooks with safety gates; 18-check CI validator; 163-test suite including negative tests;
 generated ATT&CK coverage, validation ledger and ARM deployment templates, all drift-gated;
 evidence register; Microsoft current-state alignment; SHA-pinned CI with least privilege.
 

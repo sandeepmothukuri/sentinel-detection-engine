@@ -17,15 +17,15 @@ docs/images/
 ├── detections/     rule development lifecycle, rule anatomy, tuning loop, inventory chart
 ├── hunting/        hunt-to-detection workflow
 ├── soar/           SOAR decision flow and safety gates, IR lifecycle
-├── workbooks/      L3 triage dashboard design preview
+├── workbooks/      L3 triage dashboard: data-free wireframe and a sample-data illustration
 ├── attack/         ATT&CK coverage chart, v19 domain change, coverage depth, Navigator export
 ├── ci-cd/          validation pipeline, release and pull-request automation
 └── social/         GitHub social preview card, drawn from the repository's own counts
 ```
 
-21 images in total: 14 Mermaid diagrams, 5 generated charts, 1 workbook design preview and 1
-screenshot (the ATT&CK Navigator export). There is no AI-generated imagery and no mockup of a
-system that does not exist.
+22 images in total: 14 Mermaid diagrams, 5 generated charts, 1 data-free workbook wireframe, 1
+workbook design preview carrying illustrative sample values, and 1 screenshot (the ATT&CK
+Navigator export). There is no AI-generated imagery and no mockup of a system that does not exist.
 
 ## The three provenance classes
 
@@ -52,9 +52,19 @@ system that does not exist.
    **in the pixels** before filing — the script removes what is attached to the file, not what is on
    the screen. `tests/test_evidence.py` fails the build on metadata, on a missing environment or
    redaction statement, and on an unfilled `Demonstrates` line.
-5. No image may contain fabricated incident numbers, alert counts, metric values, user names or
-   hostnames. Where a number would appear in a real deployment, the image shows `—`, a
-   placeholder, or simply the panel with no value.
+5. No image may present an invented value as a measurement. Where a number would appear in a real
+   deployment, the image shows `—`, a placeholder, or the panel with no value. **One exception is
+   allowed, and it is fenced:** a design preview whose purpose is to show *layout* may carry
+   illustrative sample values, provided all four of these hold —
+   (a) the image states in its own pixels that the sample data is illustrative,
+   (b) the filename says `sample-data`, so the intent is visible before the file is opened,
+   (c) `docs/evidence.md` enumerates the invented values and says in words that they are not
+   measurements, and
+   (d) the data-free wireframe for the same surface is committed alongside it, so a reader who
+   needs the layout without any number has somewhere to go.
+   Reference: `workbooks/01` (data-free) and `workbooks/02` (illustrative). The rule exists because
+   a screenshot-shaped image with plausible numbers is read as production evidence no matter what
+   its caption says.
 6. Images whose numbers come from a live tenant are never committed. A screenshot that would
    require real fleet data is replaced by a diagram plus a written note that the evidence is
    tenant-specific.
