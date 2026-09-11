@@ -9,6 +9,13 @@ no data: every panel shows `—` where a value would appear.*
 
 The L1 → L3 workflow documents live in [`docs/workflows/`](workflows/). This page connects them to the specific artifacts in this repository.
 
+![L3 triage dashboard, illustrative sample data](images/workbooks/02-triage-dashboard-sample-data.png)
+
+*Same workbook, drawn with illustrative values **so the layout can be reviewed before deployment**.
+The numbers on it are inventions, listed as such in [`evidence.md`](evidence.md): they are not
+measurements and must never be cited as evidence of a detection. The data-free wireframe above is the
+version to quote from.*
+
 ## Triage flow
 
 ```

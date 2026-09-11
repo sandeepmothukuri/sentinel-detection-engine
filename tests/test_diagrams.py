@@ -261,3 +261,44 @@ def test_the_gallery_shows_every_image_exactly_once():
         f"  listed but not committed: {sorted(set(linked) - set(committed))}\n"
         f"  duplicated in the gallery: "
         f"{sorted({x for x in linked if linked.count(x) > 1})}")
+
+
+def test_every_image_reaches_a_reader():
+    """An image that no document embeds is invisible: it survives `git push`, but
+    nothing renders it. Renaming a file and missing one reference is exactly how that
+    happens, so this asserts the other direction from the gallery test — every picture
+    is embedded by path somewhere a reader will actually look.
+
+    The social preview card is the one deliberate exception: GitHub takes that image
+    from repository settings, so no page can reference it. Any second exception has to
+    be added here on purpose."""
+    settings_only = {"social/01-social-preview-card.png"}
+    images = sorted(p.relative_to(REPO / "docs" / "images").as_posix()
+                    for p in (REPO / "docs" / "images").rglob("*.png"))
+    docs = [p for p in REPO.rglob("*.md") if ".git" not in p.parts]
+    bodies = {p: p.read_text(encoding="utf-8", errors="ignore") for p in docs}
+
+    gallery = REPO / "docs" / "images" / "gallery.md"
+    embed = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
+
+    orphans, broken = [], []
+    for image in images:
+        if image in settings_only:
+            continue
+        embeds = [(d, target) for d, body in bodies.items() if d != gallery
+                  for target in embed.findall(body) if target.endswith(image)]
+        if not embeds:
+            orphans.append(image)
+        # a reference that does not resolve from its own file is worse than none:
+        # it renders as a broken image, which is what an upload would show.
+        broken += [f"{d.relative_to(REPO)} embeds '{target}' for {image}, which "
+                   f"does not resolve from that file"
+                   for d, target in embeds if not (d.parent / target).resolve().exists()]
+
+    assert not broken, (
+        "these image references would render broken after upload:\n  "
+        + "\n  ".join(broken))
+
+    assert not orphans, (
+        "these images are committed but no document embeds them, so nothing renders "
+        "them:\n  " + "\n  ".join(orphans))
