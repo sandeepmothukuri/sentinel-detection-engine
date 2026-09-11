@@ -1,0 +1,87 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-entraidimpossibletravel-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a01",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'Entra ID - Impossible Travel Between Sign-Ins'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-entraidimpossibletravel-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "Entra ID - Impossible Travel Between Sign-Ins",
+        "description": "Detects two successful interactive sign-ins for the same user from locations\nwhose great-circle distance cannot be plausibly traversed in the elapsed time\n(default threshold: > 800 km/h between events). High-confidence indicator of\nsession token theft, AiTM phishing, or shared credentials.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "let velocity_kmh_threshold = 800.0;\nlet min_distance_km = 500.0;\nlet max_gap_min = 720;\nSigninLogs\n| where TimeGenerated > ago(6h)\n| where ResultType == 0\n| extend City = tostring(LocationDetails.city), Country = tostring(LocationDetails.countryOrRegion)\n| extend Lat = todouble(LocationDetails.geoCoordinates.latitude)\n| extend Lon = todouble(LocationDetails.geoCoordinates.longitude)\n// isnotempty() does not apply to numeric types — a todouble() that fails to\n// parse is null, not empty. Using isnotempty() here filtered out every row and\n// made the rule permanently silent.\n| where isnotnull(Lat) and isnotnull(Lon)\n| sort by UserPrincipalName asc, TimeGenerated asc\n| extend PrevTime = prev(TimeGenerated), PrevUser = prev(UserPrincipalName)\n| extend PrevLat = prev(Lat), PrevLon = prev(Lon), PrevCity = prev(City), PrevCountry = prev(Country)\n| where UserPrincipalName == PrevUser\n| extend DeltaMin = datetime_diff('minute', TimeGenerated, PrevTime)\n| where DeltaMin > 0 and DeltaMin < max_gap_min\n| extend DistanceKm = geo_distance_2points(PrevLon, PrevLat, Lon, Lat) / 1000.0\n| extend VelocityKmh = DistanceKm / (DeltaMin / 60.0)\n| where VelocityKmh > velocity_kmh_threshold and DistanceKm > min_distance_km\n| project TimeGenerated, UserPrincipalName, IPAddress, AppDisplayName,\n          PrevCity, PrevCountry, City, Country, DistanceKm, DeltaMin, VelocityKmh\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT6H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "InitialAccess",
+          "CredentialAccess"
+        ],
+        "techniques": [
+          "T1078.004",
+          "T1539"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "UserPrincipalName"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "IPAddress"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT6H",
+            "matchingMethod": "AllEntities"
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Impossible travel for {{UserPrincipalName}}",
+          "alertDescriptionFormat": "{{UserPrincipalName}} signed in from {{City}}/{{Country}} after signing in from {{PrevCity}}/{{PrevCountry}}. Confirm with the user before revoking sessions — VPN egress is the usual benign explanation."
+        }
+      }
+    }
+  ]
+}

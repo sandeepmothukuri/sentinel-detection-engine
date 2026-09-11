@@ -1,5 +1,11 @@
 # SOAR
 
+![SOAR decision flow and safety gates](images/soar/01-soar-safety-gate-flow.png)
+
+*Source: `docs/diagrams/soar/01-soar-safety-gate-flow.mmd`. The gate parameters shown are the
+defaults declared in the playbook ARM templates.*
+
+
 Four Logic App playbooks automate enrichment and containment. The decision pipeline and per-rule automation matrix are in [`docs/workflows/soar-decision-flow.md`](workflows/soar-decision-flow.md); each playbook's operational details are in its own `README.md`.
 
 ## Playbooks
@@ -22,6 +28,23 @@ No playbook in this pack takes a destructive action without all of:
 5. **Audit trail** — every action *and* no-action path posts a comment to the incident stating what ran, the thresholds, and the rollback command.
 6. **Failure visibility** — failed or unconfirmed actions raise a loud `WARNING` comment so an analyst closes the loop manually.
 7. **Single-flight concurrency** — triggers run one at a time to prevent racing automations on the same incident.
+
+## Enabling auto-action safely
+
+The gates above are the reason a destructive step can run unattended, and they are also the reason
+it should not run on day one. The onboarding path that matches how these parameters behave:
+
+1. **Comment-only first.** Set `DisableUserConfidenceThreshold` above 100 (and leave the firewall
+   allowlist empty of nothing — instead scope its automation rule to nothing) so every path
+   enriches and comments but never acts. No code change is needed: a threshold above the scale is
+   the off switch.
+2. **Read the comments.** They state the observed confidence, the severity gate and the exclusion
+   list for every incident. That is the data a threshold decision needs.
+3. **Lower the threshold with a tuning-log entry** naming the incident numbers that justified it,
+   then leave the allowlists in place. Relaxing a gate without a recorded reason is how an
+   automation earns a bad reputation.
+4. **Scope the automation rule, not just the playbook.** Bind each playbook to the smallest set of
+   rules and severities that still makes it useful; the gates are a second line, not the first.
 
 ## What is deliberately NOT automated
 

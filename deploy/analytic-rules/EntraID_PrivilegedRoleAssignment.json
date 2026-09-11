@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-entraidprivilegedroleassignment-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a11",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'Entra ID - Privileged Role Granted to User or Service Principal'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-entraidprivilegedroleassignment-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "Entra ID - Privileged Role Granted to User or Service Principal",
+        "description": "Detects membership being added to a privileged Entra ID directory role. An\nattacker who has already obtained directory-write permissions uses this to\nestablish durable, legitimate-looking access: the new role assignment survives\nsession revocation, password resets, and MFA re-registration. The July 2024\nMidnight Blizzard campaign against Microsoft used exactly this step\n(T1098.003). Legitimate grants are usually driven by PIM with an approval\nrecord, which is the primary triage discriminator.\n",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "// Roles with tenant-wide or security-control impact. Keep this list focused:\n// adding reader-type roles here is what turns the rule into noise.\nlet privileged_roles = dynamic([\n  \"Global Administrator\",\n  \"Privileged Role Administrator\",\n  \"Privileged Authentication Administrator\",\n  \"Application Administrator\",\n  \"Cloud Application Administrator\",\n  \"Authentication Administrator\",\n  \"Conditional Access Administrator\",\n  \"Exchange Administrator\",\n  \"SharePoint Administrator\",\n  \"Security Administrator\",\n  \"User Administrator\",\n  \"Helpdesk Administrator\",\n  \"Intune Administrator\",\n  \"Domain Services Administrator\"\n]);\nlet excluded_actors = dynamic([]);\n// Both spellings are emitted by different service versions, and the PIM\n// variants only appear when the tenant uses Privileged Identity Management.\nlet role_grant_operations = dynamic([\n  \"Add member to role\",\n  \"Add member to role (permanent)\",\n  \"Add eligible member to role\",\n  \"Add eligible member to role in PIM completed (permanent)\",\n  \"Add member to role in PIM completed (permanent)\",\n  \"Add member to role in PIM requested (permanent)\"\n]);\nAuditLogs\n| where TimeGenerated > ago(1h)\n| where OperationName in (role_grant_operations)\n| extend Actor = tostring(InitiatedBy.user.userPrincipalName)\n| extend ActorApp = tostring(InitiatedBy.app.displayName)\n| extend TargetUpn = tostring(TargetResources[0].userPrincipalName)\n| extend TargetType = tostring(TargetResources[0].type)\n| mv-expand mp = TargetResources[0].modifiedProperties\n| extend PropName = tostring(mp.displayName), PropValue = tostring(mp.newValue)\n| where PropName == \"Role.DisplayName\"\n// The role name arrives JSON-quoted inside the modifiedProperties value.\n| extend RoleName = replace_string(PropValue, \"\\\"\", \"\")\n| extend RoleName = trim(@\"[ ]\", RoleName)\n| where RoleName in (privileged_roles)\n| where Actor !in (excluded_actors) and ActorApp !in (excluded_actors)\n| project TimeGenerated, OperationName, Actor, ActorApp, RoleName,\n          TargetUpn, TargetType, Result, AdditionalDetails\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "Persistence",
+          "PrivilegeEscalation"
+        ],
+        "techniques": [
+          "T1098.003"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "Actor"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "TargetUpn"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT6H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Account"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Privileged role granted - {{RoleName}} to {{TargetUpn}}",
+          "alertDescriptionFormat": "{{Actor}} ({{ActorApp}}) added {{TargetUpn}} to {{RoleName}}. Verify against a PIM approval record or change ticket before clearing."
+        }
+      }
+    }
+  ]
+}

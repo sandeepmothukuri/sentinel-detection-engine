@@ -1,0 +1,14 @@
+flowchart LR
+  DET["Detection<br/>analytic rule fires"] --> CONF{"Confidence<br/>threshold met?"}
+  CONF -->|no| REVIEW["Analyst review only<br/>enrich, do not contain"]
+  CONF -->|yes| VAL{"Independently<br/>validated?"}
+  VAL -->|"single source only"| REVIEW
+  VAL -->|"corroborated"| SAFE{"Safety gate<br/>destructive action?"}
+  SAFE -->|"privileged or<br/>break-glass account"| REVIEW
+  SAFE -->|"on the allowlist"| REVIEW
+  SAFE -->|"blast radius unclear"| REVIEW
+  SAFE -->|"cleared"| ACT["Action<br/>disable user · isolate device<br/>block IP · open ticket"]
+  ACT --> VERIFY["Verification<br/>action confirmed, restorable,<br/>device still reachable"]
+  VERIFY --> AUDIT["Audit<br/>actor, action, entity, incident trail"]
+  AUDIT --> ROLL["Rollback path<br/>re-enable · release · unblock"]
+  ROLL --> LESSON["Post-action review<br/>false positives feed the tuning log"]

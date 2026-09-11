@@ -32,7 +32,11 @@ query: |
   | where isnotempty(RemoteUrl)
   | extend host = tolower(tostring(RemoteUrl))
   | extend Domain = parse_url(host).Host
-  | extend Tld = strcat(".", tostring(split(Domain, ".")[-1]))
+  // Take the last label explicitly. Negative indexing of a dynamic array is not
+  // supported by the documented accessor semantics; derive the index from
+  // array_length instead so the expression is unambiguous.
+  | extend DomainLabels = split(Domain, ".")
+  | extend Tld = strcat(".", tostring(DomainLabels[array_length(DomainLabels) - 1]))
   | where host has_any (dyn_dns) or Tld in (bad_tlds)
   | project TimeGenerated, DeviceName, AccountName, host, Domain, Tld, RemoteIP,
             InitiatingProcessFileName, InitiatingProcessCommandLine
@@ -56,3 +60,7 @@ limitations: |
   contains a usable URL/host string — some MDE connection rows carry bare IPs,
   which are dropped by the isnotempty(RemoteUrl) filter.
 version: 1.1.0
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.yaml

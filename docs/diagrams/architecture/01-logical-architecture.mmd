@@ -1,0 +1,45 @@
+---
+title: sentinel-detection-engine — logical architecture
+---
+flowchart TB
+  subgraph SOURCES["Telemetry sources"]
+    EID["Microsoft Entra ID"]
+    M365["Microsoft 365 / Exchange Online"]
+    MDE["Microsoft Defender for Endpoint"]
+    AZ["Azure control plane + Key Vault"]
+  end
+
+  subgraph SENTINEL["Microsoft Sentinel workspace"]
+    CONN["Data connectors<br/>Entra ID · Office 365 · Defender XDR · Azure Activity · Key Vault"]
+    LA["Log Analytics tables<br/>SigninLogs · AuditLogs · OfficeActivity<br/>DeviceProcessEvents · DeviceFileEvents<br/>DeviceNetworkEvents · DeviceInfo<br/>AzureActivity · AzureDiagnostics"]
+    RULES["18 scheduled analytics rules<br/>+ 10 hunting queries"]
+    INC["Incidents and alerts<br/>grouped, entity-mapped, MITRE-tagged"]
+    WB["L3 triage workbook<br/>queue · MTTA/MTTR · tuning candidates · telemetry freshness"]
+  end
+
+  subgraph RESPONSE["Response automation"]
+    PB1["AutoEnrichDisableUser"]
+    PB2["IsolateDeviceMDE"]
+    PB3["BlockIPAzureFirewall"]
+    PB4["CreateServiceNowTicket"]
+  end
+
+  subgraph ENGINEERING["Engineering control plane"]
+    GIT["Git repository<br/>Detections · Hunting Queries · Playbooks · Workbooks"]
+    CI["GitHub Actions<br/>validate · CI validation · pytest · drift check · release"]
+    NAV["ATT&CK coverage artifacts<br/>coverage.md · attack-navigator/layer.json"]
+  end
+
+  EID --> CONN
+  M365 --> CONN
+  MDE --> CONN
+  AZ --> CONN
+  CONN --> LA
+  LA --> RULES
+  RULES --> INC
+  INC --> WB
+  INC -->|"incident trigger"| RESPONSE
+  GIT --> CI
+  CI -->|"reviewed change"| RULES
+  RULES --> NAV
+  CI --> NAV

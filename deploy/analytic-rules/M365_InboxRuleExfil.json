@@ -1,0 +1,91 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-m365inboxruleexfil-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a05",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'M365 - Suspicious Inbox Rule (Forward / Delete)'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-m365inboxruleexfil-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "M365 - Suspicious Inbox Rule (Forward / Delete)",
+        "description": "Detects creation or modification of inbox rules that auto-forward to external\nrecipients, redirect mail, move messages to RSS / Conversation History /\nDeleted Items / Junk / Archive, or match attacker-style keywords (invoice,\npayment, wire, password, OTP). Classic BEC persistence — attacker creates a\nhidden rule that quarantines security notifications from the inbox of a\ncompromised user.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "let sensitive_folders = dynamic([\"RSS Feeds\",\"RSS Subscriptions\",\"Conversation History\",\"Deleted Items\",\"Junk Email\",\"Archive\"]);\nlet suspicious_keywords = dynamic([\"invoice\",\"payment\",\"wire\",\"bank\",\"password\",\"otp\",\"mfa\",\"security\",\"reset\"]);\nOfficeActivity\n| where TimeGenerated > ago(1h)\n| where Operation in (\"New-InboxRule\",\"Set-InboxRule\",\"UpdateInboxRules\")\n// Parameters is a dynamic array of {\"Name\":..,\"Value\":..} objects and the\n// property names are capitalised. Reading p.name/p.value yields null on every\n// row, which silently disables the rule. Regression-tested in tests/test_rules.py.\n| mv-expand p = Parameters\n| extend PName = tostring(p.Name), PValue = tostring(p.Value)\n| extend CleanValue = replace_regex(PValue, @\"^\\[|\\]$|\"\"\", \"\")\n| extend TargetEmail = iff(PName in (\"ForwardTo\",\"RedirectTo\",\"ForwardAsAttachmentTo\"),\n                           extract(@\"([A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+)\", 1, CleanValue), \"\")\n| extend UserDomain = tolower(tostring(split(UserId, \"@\")[1]))\n| extend ExternalForward = isnotempty(TargetEmail)\n                          and tolower(tostring(split(TargetEmail, \"@\")[1])) != UserDomain\n| where ExternalForward\n     or (PName == \"MoveToFolder\" and CleanValue in (sensitive_folders))\n     or (PName == \"SubjectContainsWords\" and CleanValue has_any (suspicious_keywords))\n| extend ParamDetail = strcat(PName, \": \", CleanValue)\n// RuleName is only present on rows where the Name parameter was expanded; drop\n// the empty strings so the incident shows the actual rule names, not blanks.\n| extend RuleNameScalar = iff(PName == \"Name\", CleanValue, \"\")\n| summarize Params = make_set(ParamDetail), RuleName = make_set_if(RuleNameScalar, isnotempty(RuleNameScalar))\n          by TimeGenerated, UserId, Operation, ClientIP\n| project TimeGenerated, UserId, ClientIP, Operation, RuleName, Params\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "Collection",
+          "Exfiltration",
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1114.003",
+          "T1564.008"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "UserId"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "ClientIP"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT6H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Account"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Suspicious inbox rule for {{UserId}}",
+          "alertDescriptionFormat": "{{UserId}} performed {{Operation}} from {{ClientIP}} creating a rule that forwards, redirects, or buries mail. Verify with the mailbox owner out of band."
+        }
+      }
+    }
+  ]
+}

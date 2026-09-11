@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "hunt-hunanomalousmailboxforwarding-name": {
+      "type": "string",
+      "defaultValue": "hunanomalousmailboxforwarding",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the hunting query 'HUN - Mailbox Forwarding to External Domain'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', parameters('hunt-hunanomalousmailboxforwarding-name'))]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "HUN - Mailbox Forwarding to External Domain",
+        "category": "Hunting Queries",
+        "query": "OfficeActivity\n| where TimeGenerated > ago(14d)\n| where Operation in (\"Set-Mailbox\",\"Set-ForwardingAddress\")\n// Parameters is a dynamic array of {\"Name\",\"Value\"} objects (capitalised keys).\n// Expand it and read the parameters by name instead of regex-scanning a string\n// rendering of the array — the regex form breaks silently if Microsoft changes\n// the serialisation or parameter ordering.\n| mv-expand p = Parameters\n| extend PName = tostring(p.Name), PValue = tostring(p.Value)\n| where PName in (\"ForwardingSmtpAddress\", \"ForwardingAddress\", \"DeliverToMailboxAndForward\")\n| summarize Params = make_bag(bag_pack(PName, PValue)) by TimeGenerated, UserId, ClientIP, Operation, OfficeObjectId\n| extend ForwardSmtp = tostring(Params.ForwardingSmtpAddress)\n| extend ForwardAddr = tostring(Params.ForwardingAddress)\n// ForwardingSmtpAddress values can arrive as \"smtp:user@domain.com\" and\n// ForwardingAddress as a proxy address (\"SMTP:user@domain.com\") or a DN, so\n// strip the protocol prefix and stray quote characters before parsing.\n| extend RawTarget = tostring(coalesce(ForwardSmtp, ForwardAddr))\n| extend Target = replace_regex(RawTarget, @\"(?i)^\\s*smtp:\", \"\")\n| extend Target = trim(@\" \\t\", replace_string(Target, \"\\\"\", \"\"))\n| where isnotempty(Target)\n| extend TargetDomain = tolower(tostring(split(Target, \"@\")[1]))\n| extend UserDomain = tolower(tostring(split(UserId, \"@\")[1]))\n| where isnotempty(TargetDomain) and TargetDomain != UserDomain\n| project TimeGenerated, UserId, Target, TargetDomain, ClientIP, Operation, Params\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Hypothesis - BEC actors set mailbox-level forwarding (Set-Mailbox -ForwardingSmtpAddress) to silently mirror inbound mail to an attacker address. Surface every change in 14 days where the destination domain differs from the tenant's primary"
+          },
+          {
+            "name": "tactics",
+            "value": "Collection,Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1114.003"
+          }
+        ]
+      }
+    }
+  ]
+}

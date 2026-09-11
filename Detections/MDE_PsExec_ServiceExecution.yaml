@@ -1,0 +1,103 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a10
+name: MDE - PsExec-Style Service Execution
+description: |
+  Detects the two structural markers of PsExec-style lateral movement: the
+  PsExec service binary (PSEXESVC.exe) executing, or the service control manager
+  spawning a child whose command line references an administrative share
+  (ADMIN$ / IPC$). Reusing a Windows service to run a remote payload is the
+  oldest lateral-movement primitive on Windows (T1569.002) and is used by
+  commodity ransomware affiliates and red teams alike.
+severity: Medium
+status: Available
+kind: Scheduled
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - LateralMovement
+  - Execution
+relevantTechniques:
+  - T1569.002
+  - T1021.002
+query: |
+  // PsExec unzips PSEXESVC.exe onto the target and starts it as a service. The
+  // binary name is near-unique to the tool, and legitimate software does not
+  // name its service binary PSEXESVC unless it *is* PsExec.
+  let psexec_service = dynamic(["psexesvc.exe"]);
+  // Children the service control manager spawns when a service image or command
+  // line points at an administrative share (the PsExec -c / -s pattern, and the
+  // same primitive used by SMB-based relay tooling).
+  let shell_binaries = dynamic([
+    "cmd.exe", "powershell.exe", "pwsh.exe", "net.exe", "net1.exe",
+    "whoami.exe", "sc.exe", "wmic.exe"
+  ]);
+  let admin_share_marker = "ADMIN$";
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where InitiatingProcessFileName in~ (psexec_service)
+        or (InitiatingProcessFileName =~ "services.exe"
+            and ProcessCommandLine contains admin_share_marker)
+  | where InitiatingProcessFileName in~ (psexec_service)
+        or FileName in~ (shell_binaries)
+  | project TimeGenerated, DeviceId, DeviceName, AccountName, FileName,
+            ProcessCommandLine, FolderPath, SHA256,
+            InitiatingProcessFileName, InitiatingProcessCommandLine,
+            InitiatingProcessAccountName
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+  - entityType: Process
+    fieldMappings:
+      - identifier: CommandLine
+        columnName: ProcessCommandLine
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT12H
+    matchingMethod: Selected
+    groupByEntities:
+      - Host
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: PsExec-style service execution on {{DeviceName}}
+  alertDescriptionFormat: >-
+    {{InitiatingProcessFileName}} launched {{FileName}} on {{DeviceName}} with a
+    command line referencing an administrative share: {{ProcessCommandLine}}
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: DeviceProcessEvents (Microsoft Defender for Endpoint / M365 advanced hunting) with command-line capture, plus service-execution events surfaced as process creation. Requires the SMB/445 path to be reachable between the involved hosts, which is the scenario being detected.
+  falsePositives: |
+    - Sanctioned Sysinternals PsExec used by administrators under a documented
+      change process. Treat this as a known-tool question, not a benign finding —
+      PsExec from an unexpected source account is a real incident.
+    - Automation platforms that ship their own renamed PsExec (some RMM tools).
+    - Packaged deployment tools that place a service binary on an admin share.
+  tuningGuidance: |
+    - Do not remove the PSEXESVC.exe condition; it is the highest-fidelity part of
+      the rule. If incidents are frequent, narrow the *services.exe* branch
+      instead (for example require FolderPath !startswith C:\\Program Files).
+    - Where PsExec is sanctioned, allow-list the specific source accounts via a
+      watchlist and keep the rule firing for everyone else.
+    - Pair with MDE - WinRM Remote Command Execution: seeing both on the same host
+      inside one hour indicates systematic remote-execution tooling on that host.
+  suppression: |
+    No static suppression. Sanctioned-source allow-listing is preferred over
+    suppression, preserving visibility of PsExec from any other account.
+  expectedVolume: Low to medium. Depends directly on whether your estate runs scheduled PsExec automation.
+version: 1.0.0

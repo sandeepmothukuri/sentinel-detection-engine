@@ -1,0 +1,14 @@
+---
+title: Hunt to detection workflow
+---
+flowchart TB
+  HY["Hypothesis<br/>state the behaviour and the data<br/>that would prove it"] --> DATA["Identify telemetry<br/>table, retention, known blind spots"]
+  DATA --> RUN["Run the hunt<br/>wide time window, no alerting threshold"]
+  RUN --> TRI["Triage findings<br/>entity fan-out, baseline comparison,<br/>business context"]
+  TRI --> DEC{"Finding real?"}
+  DEC -->|"benign"| DOC["Document the negative result<br/>hunt limitations updated"]
+  DEC -->|"suspicious, unknown"| ESC["Escalate per matrix<br/>evidence pack attached"]
+  DEC -->|"repeatable and high value"| PROMO["Promote to a detection<br/>add threshold, entities, metadata"]
+  PROMO --> VAL["Validation ledger entry<br/>atomic or manual procedure"]
+  VAL --> CI["CI gates + pull request"]
+  DEC -->|"no data"| GAP["Telemetry gap<br/>raised in roadmap, not silently dropped"]

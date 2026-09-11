@@ -1,13 +1,18 @@
 id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a07
-name: M365 - Suspicious OAuth Consent to Unverified Publisher
+name: M365 - OAuth Consent to High-Risk Scopes
 description: |
-  Detects user-granted OAuth consent to an application that requests high-risk
-  scopes (Mail.Read, Mail.ReadWrite, Files.ReadWrite.All, offline_access, ...).
-  Illicit-consent grant phishing (e.g. PerfectData, eM Client lookalikes) is a
-  dominant BEC vector. AuditLogs does not expose the verified-publisher flag,
-  so triage must confirm publisher status against the app registration.
+  Detects user- or admin-granted OAuth consent to an application that requests
+  high-risk scopes (Mail.Read, Mail.ReadWrite, Files.ReadWrite.All,
+  offline_access, ...). Illicit-consent grant phishing (e.g. PerfectData,
+  eM Client lookalikes) is a dominant BEC vector.
+
+  Scope note: this rule detects *high-risk scope consent*, not "unverified
+  publisher". AuditLogs does not expose the publisher-verification flag, so
+  publisher status is a triage step, not a detection predicate. The rule name
+  reflects what the query can actually prove.
 severity: High
 status: Available
+kind: Scheduled
 requiredDataConnectors:
   - connectorId: AzureActiveDirectory
     dataTypes:
@@ -64,6 +69,11 @@ incidentConfiguration:
       - Account
 eventGroupingSettings:
   aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: OAuth consent to high-risk scopes for {{AppName}}
+  alertDescriptionFormat: >-
+    {{Actor}} granted {{AppName}} access to high-risk scopes. Verify the
+    publisher and the requested permissions before removing the consent grant.
 metadata:
   author: Sandeep Mothukuri
   validationStatus: static-validation
@@ -79,7 +89,12 @@ metadata:
     - Enforce an admin-consent workflow in Entra ID; user consent to high-risk
       scopes should then be blocked, and this rule verifies that control.
     - Triage step: look up AppId in the tenant (Enterprise Applications) and check
-      the verified-publisher status manually — AuditLogs does not carry it.
+      the verified-publisher status manually — AuditLogs does not carry it, so the
+      rule cannot gate on it. Confirmed-unverified publishers with Mail.Read/
+      Files.ReadWrite.All are the priority queue.
+    - Populate excluded_apps from the sanctioned-SaaS allow-list; keep it in change
+      control and re-review each quarter, because the scope list is what makes this
+      rule fire, not the app's reputation.
   suppression: |
     No static suppression. Sanctioned apps belong in excluded_apps.
   expectedVolume: Low in tenants with the admin-consent workflow enabled.

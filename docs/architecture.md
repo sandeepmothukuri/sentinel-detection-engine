@@ -1,29 +1,34 @@
 # Architecture
 
+![Logical architecture](images/architecture/01-logical-architecture.png)
+
+*Source: `docs/diagrams/architecture/01-logical-architecture.mmd`, rendered by
+`scripts/render_diagrams.py`. Provenance: [`evidence.md`](evidence.md).*
+
+
 ## Overview
 
 `sentinel-detection-engine` is a detection-as-code repository for Microsoft Sentinel. Everything that reaches a production workspace starts as a reviewed, versioned file in Git and passes CI validation on every push.
 
 ```
-┌─────────────┐   ┌──────────────┐   ┌─────────────────┐   ┌──────────────┐
-│ Git repo     │→ │ CI (validate)│→ │ Deploy           │→ │ Microsoft     │
-│ rules+hunts  │  │ schema/ATT&CK│   │ GitOps / manual  │   │ Sentinel      │
-└─────────────┘   │ KQL lint/links│  │ / release tarball│   │ workspace     │
-                   └──────────────┘   └─────────────────┘   └──────────────┘
-                                                                     │
-        SOAR (Logic Apps) ← automation rules ← incidents ← analytics ┘
+┌─────────────────┐   ┌──────────────────┐   ┌──────────────────────────┐   ┌──────────────────────┐
+│ Git repo        │ → │ CI (validate)    │ → │ Deploy                   │ → │ Microsoft Sentinel   │
+│ rules + hunts   │ → │ schema / ATT&CK  │ → │ generated ARM in deploy/ │ → │ workspace            │
+│ metadata blocks │ → │ KQL lint / links │ → │ YAML tarball             │ → │ incidents · workbook │
+└─────────────────┘   └──────────────────┘   └──────────────────────────┘   └──────────────────────┘
 ```
 
 ## Components
 
 | Component | Location | Purpose |
 |---|---|---|
-| Scheduled analytics rules (12) | `Detections/*.yaml` | High-signal detections across Entra ID, M365, MDE, Azure |
+| Scheduled analytics rules (18) | `Detections/*.yaml` | High-signal detections across Entra ID, M365, MDE, Azure |
 | Hunting queries (10) | `Hunting Queries/*.yaml` | Hypothesis-driven interactive hunts |
 | SOAR playbooks (4) | `Playbooks/*/azuredeploy.json` | Enrichment + containment + ticketing |
 | Workbook | `Workbooks/L3-Triage-Dashboard.json` | L3 triage KPIs, tuning indicators |
 | ATT&CK layer | `attack-navigator/layer.json` | Auto-generated Navigator coverage |
-| CI scripts | `scripts/` | Validation, coverage generation, packaging |
+| Generated ARM deployment set | `deploy/` | `alertRules` and `savedSearches` templates generated from the rule files |
+| CI scripts | `scripts/` | Validation, coverage generation, ARM generation, packaging |
 | Tests | `tests/` | pytest suite + atomic test mapping |
 
 ## Data flow (detection)
@@ -37,7 +42,7 @@
 Each rule YAML carries:
 
 - **Sentinel core fields** — id, name, severity, tactics/techniques, connectors, query, entity mappings, incident/grouping configuration.
-- **`metadata:` block** (author-facing, stripped for GitOps import by `scripts/package_rules.py`) — false positives, tuning guidance, suppression policy, expected volume, telemetry dependency, validation status.
+- **`metadata:` block** (author-facing; kept in the rule file and deliberately absent from the generated ARM templates, because it is not a property of an analytics rule) — false positives, tuning guidance, suppression policy, expected volume, telemetry dependency, validation status.
 
 ## Data source coverage
 

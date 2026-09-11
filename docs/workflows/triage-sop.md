@@ -1,6 +1,11 @@
 # Triage SOP — Sentinel Incidents
 
-> Reference document for the L1 → L2 → L3 hand-off. Goal: under 7 min average triage time per incident, ≥ 90% true-positive routing to L2+.
+> Reference document for the L1 → L2 → L3 hand-off.
+>
+> The targets in this document (7-minute average triage, ≥ 90% true-positive routing) are **proposed
+> targets for a deploying SOC, not measurements from this repository**. No incident has been triaged
+> with this SOP yet; the numbers exist so that a team adopting it has something concrete to agree or
+> disagree with.
 
 ## 0  Triage tiers
 
@@ -64,10 +69,11 @@ The detection-engineering on-call reviews the tuning log weekly and lands change
 
 | Metric | Target | Source |
 |---|---|---|
-| MTTA (mean time to acknowledge) | < 5 min, High | Sentinel `SecurityIncident.CreatedTime` → first ownership change |
+| MTTA (mean time to acknowledge) | < 5 min, High | `SecurityIncident.CreatedTime` → `FirstModifiedTime`, the platform's first-touch timestamp |
 | MTTD (mean dwell time) | < 1 h, High | `FirstActivityTime` → `CreatedTime` |
 | MTTR (mean time to remediate) | < 4 h, High | `CreatedTime` → `ClosedTime` |
-| FP rate per rule | < 30% | `SecurityIncident.Classification` |
+| FP rate per rule | < 30% on ≥ 5 closures | `SecurityIncident.Classification` (the gate is defined in `tests/validation/performance-metrics.md`) |
 | Escalations rejected by L2 | < 10% | Manual sample |
 
-These are wired into the **L3 Triage Dashboard** workbook (see `Workbooks/`).
+These are wired into the **L3 Triage Dashboard** workbook (see `Workbooks/`). Until incidents have
+been closed with a classification, every one of them reads `Not yet measured`.

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "hunt-hunnewscheduledtask-name": {
+      "type": "string",
+      "defaultValue": "hunnewscheduledtask",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the hunting query 'HUN - New Scheduled Task With Script Action'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', parameters('hunt-hunnewscheduledtask-name'))]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "HUN - New Scheduled Task With Script Action",
+        "category": "Hunting Queries",
+        "query": "DeviceProcessEvents\n| where TimeGenerated > ago(24h)\n| where FileName in~ (\"schtasks.exe\",\"powershell.exe\",\"pwsh.exe\")\n| where ProcessCommandLine matches regex @\"(?i)(schtasks.*\\/create|Register-ScheduledTask|New-ScheduledTaskAction)\"\n| where ProcessCommandLine has_any (\"powershell\",\"cmd.exe\",\"wscript\",\"cscript\",\"mshta\",\"rundll32\",\"regsvr32\",\"-enc\",\"FromBase64String\",\"http://\",\"https://\")\n| project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine,\n          InitiatingProcessFileName, InitiatingProcessCommandLine\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Hypothesis - schtasks.exe / Register-ScheduledTask creating a task that runs a script interpreter, encoded payload, or LOLBin is a top persistence TTP across ransomware affiliates."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,PrivilegeEscalation"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1053.005"
+          }
+        ]
+      }
+    }
+  ]
+}

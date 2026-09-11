@@ -6,6 +6,7 @@ description: |
   remote HTAs without writing to disk.
 severity: High
 status: Available
+kind: Scheduled
 requiredDataConnectors:
   - connectorId: MicrosoftThreatProtection
     dataTypes:
@@ -51,6 +52,11 @@ incidentConfiguration:
       - Host
 eventGroupingSettings:
   aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: mshta executing a remote script on {{DeviceName}}
+  alertDescriptionFormat: >-
+    mshta.exe on {{DeviceName}} was launched with a remote or script-scheme
+    payload, parent process {{ParentFile}}.
 metadata:
   author: Sandeep Mothukuri
   validationStatus: static-validation

@@ -1,0 +1,100 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-azurekeyvaultaccesscontrolchange-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a12",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'Azure - Key Vault Access Policy or Network ACL Modified'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-azurekeyvaultaccesscontrolchange-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "Azure - Key Vault Access Policy or Network ACL Modified",
+        "description": "Detects a write to a Key Vault's access policy, firewall rules, or top-level\nvault configuration. This is the second half of the Key Vault attack path:\nfirst weaken the vault's access controls — grant a policy that allows secrets\nto be read, or open the firewall so the attacker's address is permitted — and\nthen harvest credentials. Pairs with the \"Key Vault Secret Access Spike\" rule,\nwhich detects the harvesting step. Alerting on the control change catches the\nintrusion before the secrets leave.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "let sensitive_operations = dynamic([\n  \"MICROSOFT.KEYVAULT/VAULTS/WRITE\",\n  \"MICROSOFT.KEYVAULT/VAULTS/ACCESSPOLICIES/WRITE\",\n  \"MICROSOFT.KEYVAULT/VAULTS/FIREWALLRULES/WRITE\",\n  \"MICROSOFT.KEYVAULT/VAULTS/PRIVATEENDPOINTCONNECTIONS/WRITE\",\n  \"MICROSOFT.KEYVAULT/VAULTS/PRIVATEENDPOINTCONNECTIONS/APPROVEPRIVATEENDPOINTCONNECTION/ACTION\"\n]);\nlet excluded_callers = dynamic([]);\nAzureActivity\n| where TimeGenerated > ago(1h)\n| where OperationNameValue in (sensitive_operations)\n| where ActivityStatusValue in (\"Success\", \"Succeeded\")\n| where Caller !in (excluded_callers)\n// The request body carries the new ACL/policy state. It is occasionally\n// truncated on very large payloads, so the extracted values are triage aids —\n// treat a null as \"open the Azure Activity record\", not as \"no change\".\n| extend props = parse_json(tostring(Properties))\n| extend reqBody = parse_json(tostring(props.requestbody))\n| extend vaultProps = parse_json(tostring(reqBody.properties))\n| extend DefaultNetworkAction = tostring(vaultProps.networkAcls.defaultAction)\n| extend FirewallBypass = tostring(vaultProps.networkAcls.bypass)\n| extend AccessPolicyCount = array_length(vaultProps.accessPolicies)\n| project TimeGenerated, Caller, CallerIpAddress, ResourceId, ResourceGroup,\n          OperationNameValue, ActivityStatusValue,\n          DefaultNetworkAction, FirewallBypass, AccessPolicyCount, props\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "Persistence",
+          "PrivilegeEscalation",
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1098",
+          "T1686.001"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "Caller"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "CallerIpAddress"
+              }
+            ]
+          },
+          {
+            "entityType": "AzureResource",
+            "fieldMappings": [
+              {
+                "identifier": "ResourceId",
+                "columnName": "ResourceId"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT6H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "AzureResource"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Key Vault access control modified - {{ResourceId}}",
+          "alertDescriptionFormat": "{{Caller}} performed {{OperationNameValue}} on {{ResourceId}} from {{CallerIpAddress}}. Verify the new access policy or network ACL is an approved change before treating it as routine."
+        }
+      }
+    }
+  ]
+}

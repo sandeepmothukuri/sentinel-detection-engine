@@ -1,0 +1,99 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-mdepowershellencodedcommand-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a0a",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'MDE - PowerShell EncodedCommand With Long Payload'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-mdepowershellencodedcommand-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "MDE - PowerShell EncodedCommand With Long Payload",
+        "description": "Detects powershell.exe / pwsh.exe invocations with -EncodedCommand (or short\naliases -enc, -e, -ec) and a Base64 payload longer than 250 chars. Decodes\nshort payloads inline. Long encoded command lines are almost always malicious\nin non-admin environments.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "DeviceProcessEvents\n| where TimeGenerated > ago(1h)\n| where FileName in~ (\"powershell.exe\",\"pwsh.exe\")\n| where ProcessCommandLine matches regex @\"(?i)\\s-(?:enc(?:odedcommand)?|e|ec)\\s+[A-Za-z0-9+/=]{250,}\"\n| extend EncodedBlob = extract(@\"(?i)\\s-(?:enc(?:odedcommand)?|e|ec)\\s+([A-Za-z0-9+/=]+)\", 1, ProcessCommandLine)\n| extend DecodedAttempt = iff(strlen(EncodedBlob) < 4000,\n                              base64_decode_tostring(EncodedBlob),\n                              \"<too long, decode offline>\")\n| project TimeGenerated, DeviceId, DeviceName, AccountName, FileName, ProcessCommandLine,\n          EncodedBlob, DecodedAttempt, InitiatingProcessFileName,\n          InitiatingProcessCommandLine\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "Execution",
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1059.001",
+          "T1027"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "DeviceName"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "AccountName"
+              }
+            ]
+          },
+          {
+            "entityType": "Process",
+            "fieldMappings": [
+              {
+                "identifier": "CommandLine",
+                "columnName": "ProcessCommandLine"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT12H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Host"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Encoded PowerShell payload on {{DeviceName}}",
+          "alertDescriptionFormat": "{{FileName}} on {{DeviceName}} ran with a long Base64 -EncodedCommand payload. Decode it from the alert's EncodedBlob or DecodedAttempt column before dispositioning."
+        }
+      }
+    }
+  ]
+}

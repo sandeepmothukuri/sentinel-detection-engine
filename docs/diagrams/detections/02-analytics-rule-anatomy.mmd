@@ -1,0 +1,13 @@
+flowchart LR
+  RULE["Detections/&lt;rule&gt;.yaml<br/>one analytics rule"] --> G1["Schema<br/>valid UUID · unique id and name<br/>kind present · severity known"]
+  RULE --> G2["Scheduling<br/>5m–14d bounds · frequency ≤ period<br/>no now() in a scheduled rule"]
+  RULE --> G3["ATT&amp;CK<br/>technique exists in the vendored dataset<br/>tactic must cohere"]
+  G1 --> G4["Telemetry<br/>every table used implies the declared<br/>connector, via a table catalog"]
+  G2 --> G5["Query<br/>KQL lint · explicit ago() bound<br/>TimeGenerated survives projection"]
+  G3 --> G6["Entities<br/>identifier valid for the entity type<br/>column exists and is scalar"]
+  G4 --> G7["Alert details<br/>every placeholder resolves<br/>to a query column"]
+  G5 --> G8["Metadata<br/>named human author · production bar<br/>on false-positive and tuning prose"]
+  G6 --> G9["Validation ledger<br/>one entry per rule · atomic exists<br/>upstream or manual procedure"]
+  G7 --> OUT["CI verdict<br/>28 files, one report, exit code on failure"]
+  G8 --> OUT
+  G9 --> OUT

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "hunt-hunnewsshconnectionfrominternal-name": {
+      "type": "string",
+      "defaultValue": "hunnewsshconnectionfrominternal",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the hunting query 'HUN - Lateral SSH/RDP From Workstation'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', parameters('hunt-hunnewsshconnectionfrominternal-name'))]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "HUN - Lateral SSH/RDP From Workstation",
+        "category": "Hunting Queries",
+        "query": "let workstations =\n  DeviceInfo\n  | where TimeGenerated > ago(7d)\n  | summarize arg_max(TimeGenerated, *) by DeviceId\n  | where DeviceType == \"Workstation\"\n  | project DeviceId, DeviceName;\n// Fan-out floor. A workstation legitimately making one SSH/RDP connection is\n// routine; the hunt is looking for *spread*. Named and tunable so it can be\n// raised for a large admin population without editing the query body.\nlet min_distinct_targets = 3;\nDeviceNetworkEvents\n| where TimeGenerated > ago(24h)\n| where RemotePort in (22, 3389)\n// Some connectors classify RFC1918 addresses as \"Private\" and some leave the\n// field empty on internal connections; accept both rather than dropping rows.\n| where RemoteIPType == \"Private\" or isempty(RemoteIPType)\n| join kind=inner workstations on DeviceId\n| summarize Connections = count(), Targets = make_set(RemoteIP, 25),\n            Procs = make_set(InitiatingProcessFileName, 5)\n          by DeviceName, AccountName, RemotePort, bin(TimeGenerated, 1h)\n| where array_length(Targets) >= min_distinct_targets\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Hypothesis - Standard end-user workstations should almost never initiate SSH (22) or RDP (3389) to other internal hosts. Surface these connections to catch lateral movement post-compromise."
+          },
+          {
+            "name": "tactics",
+            "value": "LateralMovement,Discovery"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1021.001,T1021.004"
+          }
+        ]
+      }
+    }
+  ]
+}

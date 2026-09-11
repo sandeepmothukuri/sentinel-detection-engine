@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "hunt-hunrareprocessperdevice-name": {
+      "type": "string",
+      "defaultValue": "hunrareprocessperdevice",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the hunting query 'HUN - Rare Process Per Device (org-wide rarity)'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', parameters('hunt-hunrareprocessperdevice-name'))]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "HUN - Rare Process Per Device (org-wide rarity)",
+        "category": "Hunting Queries",
+        "query": "let lookback = 14d;\nDeviceProcessEvents\n| where TimeGenerated > ago(lookback)\n| where isnotempty(SHA1)\n| summarize Devices = dcount(DeviceId), DeviceNames = make_set(DeviceName, 5),\n            FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated),\n            SampleCmd = any(ProcessCommandLine), Folder = any(FolderPath)\n          by SHA1, FileName\n| where Devices <= 2\n| where Folder !startswith @\"C:\\Program Files\"\n     and Folder !startswith @\"C:\\Windows\\WinSxS\"\n| sort by LastSeen desc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Hypothesis - A binary that runs on exactly 1 device estate-wide is either a developer toolchain leak, niche LOB software, or attacker tooling. Surface process executions where the SHA1 has been seen on <= 2 devices in the last 14 days."
+          },
+          {
+            "name": "tactics",
+            "value": "Execution,DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1059,T1027"
+          }
+        ]
+      }
+    }
+  ]
+}

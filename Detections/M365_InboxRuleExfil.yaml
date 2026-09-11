@@ -9,6 +9,7 @@ description: |
   compromised user.
 severity: High
 status: Available
+kind: Scheduled
 requiredDataConnectors:
   - connectorId: Office365
     dataTypes:
@@ -30,8 +31,11 @@ query: |
   OfficeActivity
   | where TimeGenerated > ago(1h)
   | where Operation in ("New-InboxRule","Set-InboxRule","UpdateInboxRules")
+  // Parameters is a dynamic array of {"Name":..,"Value":..} objects and the
+  // property names are capitalised. Reading p.name/p.value yields null on every
+  // row, which silently disables the rule. Regression-tested in tests/test_rules.py.
   | mv-expand p = Parameters
-  | extend PName = tostring(p.name), PValue = tostring(p.value)
+  | extend PName = tostring(p.Name), PValue = tostring(p.Value)
   | extend CleanValue = replace_regex(PValue, @"^\[|\]$|""", "")
   | extend TargetEmail = iff(PName in ("ForwardTo","RedirectTo","ForwardAsAttachmentTo"),
                              extract(@"([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+)", 1, CleanValue), "")
@@ -42,7 +46,10 @@ query: |
        or (PName == "MoveToFolder" and CleanValue in (sensitive_folders))
        or (PName == "SubjectContainsWords" and CleanValue has_any (suspicious_keywords))
   | extend ParamDetail = strcat(PName, ": ", CleanValue)
-  | summarize Params = make_set(ParamDetail), RuleName = make_set(iff(PName == "Name", CleanValue, ""))
+  // RuleName is only present on rows where the Name parameter was expanded; drop
+  // the empty strings so the incident shows the actual rule names, not blanks.
+  | extend RuleNameScalar = iff(PName == "Name", CleanValue, "")
+  | summarize Params = make_set(ParamDetail), RuleName = make_set_if(RuleNameScalar, isnotempty(RuleNameScalar))
             by TimeGenerated, UserId, Operation, ClientIP
   | project TimeGenerated, UserId, ClientIP, Operation, RuleName, Params
 entityMappings:
@@ -65,11 +72,16 @@ incidentConfiguration:
       - Account
 eventGroupingSettings:
   aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: Suspicious inbox rule for {{UserId}}
+  alertDescriptionFormat: >-
+    {{UserId}} performed {{Operation}} from {{ClientIP}} creating a rule that
+    forwards, redirects, or buries mail. Verify with the mailbox owner out of band.
 metadata:
   author: Sandeep Mothukuri
   validationStatus: static-validation
   testMapping: tests/atomics.md
-  telemetryDependency: OfficeActivity (Office 365 connector, Exchange workload). Parameters is a dynamic array of name/value pairs; the query mv-expands it, so it is robust to parameter ordering and multi-value fields.
+  telemetryDependency: OfficeActivity (Office 365 connector, Exchange workload). Parameters is a dynamic array of {"Name","Value"} objects; the query mv-expands it, so it is robust to parameter ordering and multi-value fields. Note the property names are capitalised — `p.name` returns null. UpdateInboxRules (emitted by the Outlook desktop client) carries no Parameters payload, so only New-InboxRule / Set-InboxRule rows produce rule detail.
   falsePositives: |
     - Users who forward mail to personal addresses or delegate assistants (policy
       question, not necessarily compromise).

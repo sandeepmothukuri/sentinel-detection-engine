@@ -1,0 +1,91 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-m365oauthconsentsuspiciousapp-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a07",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'M365 - OAuth Consent to High-Risk Scopes'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-m365oauthconsentsuspiciousapp-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "M365 - OAuth Consent to High-Risk Scopes",
+        "description": "Detects user- or admin-granted OAuth consent to an application that requests\nhigh-risk scopes (Mail.Read, Mail.ReadWrite, Files.ReadWrite.All,\noffline_access, ...). Illicit-consent grant phishing (e.g. PerfectData,\neM Client lookalikes) is a dominant BEC vector.\n\nScope note: this rule detects *high-risk scope consent*, not \"unverified\npublisher\". AuditLogs does not expose the publisher-verification flag, so\npublisher status is a triage step, not a detection predicate. The rule name\nreflects what the query can actually prove.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "let high_risk_scopes = dynamic([\n  \"Mail.Read\",\"Mail.ReadWrite\",\"Mail.Send\",\"MailboxSettings.ReadWrite\",\n  \"Files.Read.All\",\"Files.ReadWrite.All\",\"Sites.ReadWrite.All\",\n  \"offline_access\",\"User.Read.All\",\"Directory.Read.All\",\"Contacts.Read\"\n]);\nlet excluded_apps = dynamic([]);\nAuditLogs\n| where TimeGenerated > ago(1h)\n| where OperationName == \"Consent to application\"\n| extend Actor = tostring(InitiatedBy.user.userPrincipalName)\n| extend AppName = tostring(TargetResources[0].displayName)\n| extend AppId = tostring(TargetResources[0].id)\n| where AppId !in (excluded_apps)\n| mv-expand mod = TargetResources[0].modifiedProperties\n| extend PropName = tostring(mod.displayName), NewValue = tostring(mod.newValue)\n| where PropName == \"ConsentAction.Permissions\"\n| extend Scopes = NewValue\n| extend IsAdminConsent = NewValue has \"AdminConsent=True\"\n| where Scopes has_any (high_risk_scopes)\n| project TimeGenerated, Actor, AppName, AppId, IsAdminConsent, Scopes\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "InitialAccess",
+          "Persistence",
+          "CredentialAccess"
+        ],
+        "techniques": [
+          "T1528",
+          "T1098.001"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "Actor"
+              }
+            ]
+          },
+          {
+            "entityType": "CloudApplication",
+            "fieldMappings": [
+              {
+                "identifier": "AppId",
+                "columnName": "AppId"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT6H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Account"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "OAuth consent to high-risk scopes for {{AppName}}",
+          "alertDescriptionFormat": "{{Actor}} granted {{AppName}} access to high-risk scopes. Verify the publisher and the requested permissions before removing the consent grant."
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a0e
+name: MDE - Ransomware-Style Mass File Rename Per Device
+description: |
+  Detects a device renaming an unusually large number of files to a different
+  extension inside a short window — the encryption pass of a ransomware
+  payload. Aggregating rename volume per device (rather than alerting per file)
+  keeps the alert count at one per infected host and survives the low-and-slow
+  variants that throttle encryption to stay under per-process thresholds.
+severity: High
+status: Available
+kind: Scheduled
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceFileEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Impact
+relevantTechniques:
+  - T1486
+query: |
+  let rename_threshold = 300;
+  let bucket = 15m;
+  DeviceFileEvents
+  | where TimeGenerated > ago(1h)
+  | where ActionType == "FileRenamed"
+  | extend OldExt = tolower(tostring(extract(@"\.([A-Za-z0-9]{1,10})$", 1, PreviousFileName)))
+  | extend NewExt = tolower(tostring(extract(@"\.([A-Za-z0-9]{1,10})$", 1, FileName)))
+  // An encryption pass changes the extension. A move or a folder rename keeps
+  // it, so requiring a *change* removes most of the routine rename noise.
+  | where isnotempty(NewExt) and NewExt != OldExt
+  | summarize RenamedFiles = dcount(FileName),
+              NewExtensions = make_set(NewExt, 10),
+              ExampleFiles = make_set(FileName, 10),
+              Folder = any(FolderPath),
+              FirstRename = min(TimeGenerated),
+              LastRename = max(TimeGenerated)
+            by DeviceId, DeviceName, AccountName, bin(TimeGenerated, bucket)
+  | where RenamedFiles >= rename_threshold
+  | extend RenamesPerSecond = round(RenamedFiles / (bucket / 1s), 2)
+  // Sentinel cannot entity-map an array (make_set) column, so project a single
+  // representative file path as a scalar for the File entity.
+  | extend ExampleFile = tostring(ExampleFiles[0])
+  | project TimeGenerated = FirstRename, LastRename, DeviceId, DeviceName,
+            AccountName, RenamedFiles, RenamesPerSecond, NewExtensions,
+            ExampleFile, Folder
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+  - entityType: File
+    fieldMappings:
+      - identifier: Name
+        columnName: ExampleFile
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT12H
+    matchingMethod: Selected
+    groupByEntities:
+      - Host
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: Mass file rename on {{DeviceName}} ({{RenamedFiles}} files)
+  alertDescriptionFormat: >-
+    {{RenamedFiles}} files were renamed to a different extension on
+    {{DeviceName}} under account {{AccountName}} within 15 minutes — consistent
+    with a ransomware encryption pass.
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: DeviceFileEvents (Microsoft Defender for Endpoint / M365 advanced hunting). Requires file-event streaming, which is on by default for onboarded Windows devices; macOS/Linux coverage depends on the platform feature set.
+  falsePositives: |
+    - Archiving, compression, or media-transcoding pipelines that rename outputs
+      (for example a transcode job rewriting thousands of .ts segments).
+    - Bulk data migrations and DR cutovers run by scripts.
+    - Developer workstations running a build or test suite that regenerates
+      snapshot files.
+  tuningGuidance: |
+    - rename_threshold (300 per 15 minutes) is the primary knob. Raising it to
+      1000 removes almost all tooling noise but lets throttled encryption
+      (a few hundred files per hour) slip; lowering it to 100 catches slower
+      payloads at the cost of more migration false positives.
+    - If a specific migration is scheduled, exclude by AccountName for the
+      maintenance window and record it in the tuning log — do not raise the global
+      threshold for a temporary event.
+    - Pair with MDE - Shadow Copy / Recovery Inhibited: the two firing together on
+      one host is a confirmed ransomware pattern, not a tuning question.
+  suppression: |
+    No static suppression. Scheduled migrations are handled by a time-boxed
+    AccountName exclusion recorded in the tuning log.
+  expectedVolume: Very low. Expect zero outside migration windows on a typical estate.
+version: 1.0.0

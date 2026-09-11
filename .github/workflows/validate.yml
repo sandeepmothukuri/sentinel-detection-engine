@@ -4,15 +4,35 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:      # reused as the release gate so the two can never diverge
+    secrets:
+      GITHUB_TOKEN:
+        required: false
+
+# Least privilege: this workflow reads the repository and uploads an artefact.
+# It never writes to the repository, so no job is granted write scope.
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
+    name: Static validation and tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      # Third-party and first-party actions are pinned to immutable commit SHAs.
+      # The trailing comment records the human-readable version the SHA is from.
+      - name: Check out
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
 
@@ -22,16 +42,20 @@ jobs:
           pip install pyyaml yamllint pytest
 
       - name: Secrets scan
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: false
+        # A secret in a detection repository is an incident, not a warning.
+        # continue-on-error is deliberately absent.
 
       - name: yamllint
         run: yamllint Detections "Hunting Queries" Playbooks .github/workflows
 
-      - name: Rule validation (schema, ATT&CK, telemetry, metadata, KQL lint)
+      - name: Rule validation (schema, ATT&CK, telemetry, entities, alert details, metadata, KQL)
         run: python scripts/ci_validate.py
+
+      - name: Validation ledger
+        run: python scripts/ci_validate.py --ledger-only
 
       - name: Python test suite
         run: python -m pytest tests -v
@@ -39,17 +63,40 @@ jobs:
       - name: Markdown link check
         run: python scripts/check_links.py
 
-      - name: Regenerate coverage and fail if drift
+      - name: Regenerate coverage and fail on drift
         run: |
           python scripts/generate_coverage.py
-          git diff --exit-code coverage.md attack-navigator/layer.json \
-            || (echo "::error::coverage.md or attack-navigator/layer.json is stale. Run scripts/generate_coverage.py and commit." && exit 1)
+          if ! git diff --exit-code coverage.md attack-navigator/layer.json; then
+            echo "::error::coverage.md or attack-navigator/layer.json is stale. Run scripts/generate_coverage.py and commit the result."
+            exit 1
+          fi
+
+      - name: Regenerate validation ledger and fail on drift
+        run: |
+          python scripts/generate_atomics_ledger.py
+          if ! git diff --exit-code tests/atomics.md; then
+            echo "::error::tests/atomics.md is stale. Run scripts/generate_atomics_ledger.py and commit the result."
+            exit 1
+          fi
+
+      - name: Regenerate ARM templates and fail on drift
+        run: |
+          python scripts/generate_arm_templates.py
+          if ! git diff --exit-code deploy/; then
+            echo "::error::deploy/ is stale. Run scripts/generate_arm_templates.py and commit the result."
+            exit 1
+          fi
+
+      - name: Check the workbook design preview matches its recorded digest
+        run: python scripts/render_design_preview.py --check
 
       - name: Package rules for GitOps import
         run: python scripts/package_rules.py
 
       - name: Upload packaged rules
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: sentinel-yaml
           path: dist/sentinel-yaml
+          if-no-files-found: error
+          retention-days: 14

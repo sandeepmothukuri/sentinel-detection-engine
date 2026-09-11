@@ -57,3 +57,7 @@ limitations: |
   lookback requires a workspace that keeps that volume of process events
   (cost consideration for large estates).
 version: 1.1.0
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.yaml

@@ -8,6 +8,7 @@ description: |
   that have fully rolled out modern auth.
 severity: High
 status: Available
+kind: Scheduled
 requiredDataConnectors:
   - connectorId: AzureActiveDirectory
     dataTypes:
@@ -24,15 +25,19 @@ relevantTechniques:
   - T1110
   - T1078.004
 query: |
+  // Genuinely legacy/basic-auth protocol identifiers only. AutoDiscover and
+  // "Exchange Web Services" are deliberately excluded: modern OAuth clients emit
+  // them too (Outlook for Mac, third-party EWS integrations), so including them
+  // produced false positives on healthy estates without adding detection value.
+  // Add them back via the tuning guidance only if your tenant still fronts EWS
+  // with basic auth.
   let legacy_clients = dynamic([
     "Other clients; POP",
     "Other clients; IMAP",
     "Other clients; SMTP",
     "Other clients; MAPI",
     "Other clients; Exchange ActiveSync",
-    "Authenticated SMTP",
-    "Exchange Web Services",
-    "AutoDiscover"
+    "Authenticated SMTP"
   ]);
   let excluded_users = dynamic([]);
   SigninLogs
@@ -63,6 +68,11 @@ incidentConfiguration:
       - IP
 eventGroupingSettings:
   aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: Legacy auth sign-in for {{UserPrincipalName}}
+  alertDescriptionFormat: >-
+    {{UserPrincipalName}} authenticated successfully over {{ClientAppUsed}} from
+    {{IPAddress}}. Legacy protocols bypass Conditional Access and MFA.
 metadata:
   author: Sandeep Mothukuri
   validationStatus: static-validation
@@ -75,6 +85,9 @@ metadata:
   tuningGuidance: |
     - Populate excluded_users with the UPNs of documented basic-auth service accounts.
       Keep that list in change control; every entry must have an owner.
+    - If your tenant still allows basic-auth EWS or AutoDiscover, add
+      "Exchange Web Services" / "AutoDiscover" back to legacy_clients and expect a
+      large volume increase — validate the noise on one pilot user group first.
     - Best practice is to block legacy auth with Conditional Access and let this rule
       verify the control instead of tuning it into silence.
   suppression: |

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "hunt-hunofficechildprocess-name": {
+      "type": "string",
+      "defaultValue": "hunofficechildprocess",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the hunting query 'HUN - Office Apps Spawning Script Interpreters'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', parameters('hunt-hunofficechildprocess-name'))]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "HUN - Office Apps Spawning Script Interpreters",
+        "category": "Hunting Queries",
+        "query": "let office_parents = dynamic([\"winword.exe\",\"excel.exe\",\"powerpnt.exe\",\"outlook.exe\",\"msaccess.exe\",\"mspub.exe\",\"visio.exe\",\"onenote.exe\",\"onenotem.exe\"]);\nlet suspicious_children = dynamic([\"cmd.exe\",\"powershell.exe\",\"pwsh.exe\",\"wscript.exe\",\"cscript.exe\",\"mshta.exe\",\"rundll32.exe\",\"regsvr32.exe\",\"bitsadmin.exe\",\"certutil.exe\",\"installutil.exe\",\"msbuild.exe\",\"hh.exe\"]);\nDeviceProcessEvents\n| where TimeGenerated > ago(24h)\n| where InitiatingProcessFileName in~ (office_parents)\n| where FileName in~ (suspicious_children)\n| project TimeGenerated, DeviceName, AccountName, InitiatingProcessFileName,\n          InitiatingProcessCommandLine, FileName, ProcessCommandLine\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Hypothesis - Macro / template-injection / DLL-hijack payloads cause winword, excel, powerpnt, outlook, msaccess, mspub, visio, onenote to spawn cmd, powershell, wscript, cscript, mshta, rundll32, regsvr32, bitsadmin, certutil."
+          },
+          {
+            "name": "tactics",
+            "value": "Execution,InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1566.001,T1059"
+          }
+        ]
+      }
+    }
+  ]
+}

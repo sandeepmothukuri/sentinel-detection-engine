@@ -6,6 +6,7 @@ description: |
   wear down a user until they approve a malicious request.
 severity: High
 status: Available
+kind: Scheduled
 requiredDataConnectors:
   - connectorId: AzureActiveDirectory
     dataTypes:
@@ -41,7 +42,7 @@ query: |
   | join kind=inner success on UserPrincipalName
   | where SuccessTime between (LastFail .. (LastFail + window))
   | where IPAddress == SuccessIP
-  | project FirstFail, LastFail, SuccessTime, UserPrincipalName, IPAddress,
+  | project TimeGenerated = SuccessTime, FirstFail, LastFail, UserPrincipalName, IPAddress,
             SuccessIP, FailedMFA, AppDisplayName, UserAgent
 entityMappings:
   - entityType: Account
@@ -61,6 +62,12 @@ incidentConfiguration:
     matchingMethod: AllEntities
 eventGroupingSettings:
   aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: MFA fatigue then success for {{UserPrincipalName}}
+  alertDescriptionFormat: >-
+    {{UserPrincipalName}} produced {{FailedMFA}} failed MFA prompts from
+    {{IPAddress}} and then approved a prompt from the same address within 30
+    minutes.
 metadata:
   author: Sandeep Mothukuri
   validationStatus: static-validation

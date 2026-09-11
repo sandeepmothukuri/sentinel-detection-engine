@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "hunt-hununsignedbinaryfromtemp-name": {
+      "type": "string",
+      "defaultValue": "hununsignedbinaryfromtemp",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the hunting query 'HUN - Unsigned Binary Execution From Temp/AppData'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', parameters('hunt-hununsignedbinaryfromtemp-name'))]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "HUN - Unsigned Binary Execution From Temp/AppData",
+        "category": "Hunting Queries",
+        "query": "DeviceProcessEvents\n| where TimeGenerated > ago(24h)\n| where FolderPath matches regex @\"(?i)\\\\(AppData\\\\(Local|Roaming)\\\\Temp|Users\\\\[^\\\\]+\\\\AppData|Windows\\\\Temp)\\\\\"\n| where FileName endswith \".exe\" or FileName endswith \".dll\" or FileName endswith \".scr\"\n| extend Signed = tostring(parse_json(tostring(AdditionalFields)).IsSigned)\n| where isempty(Signed) or Signed == \"False\" or Signed == \"false\"\n| project TimeGenerated, DeviceName, AccountName, FileName, FolderPath,\n          SHA256, ProcessCommandLine, InitiatingProcessFileName,\n          InitiatingProcessCommandLine\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Hypothesis - Loader stagers (IcedID, Pikabot, Latrodectus) drop unsigned PE files to %TEMP% or %APPDATA% and run them. Surface executions where the process binary is unsigned and lives under those paths."
+          },
+          {
+            "name": "tactics",
+            "value": "Execution,DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1204.002,T1027"
+          }
+        ]
+      }
+    }
+  ]
+}

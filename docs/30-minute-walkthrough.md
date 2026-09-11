@@ -97,7 +97,7 @@ Sentinel → **Data connectors** with at least 4 green "Connected" rows.
 
 ### 3.1  Push the repo to your GitHub
 
-On your local machine (PowerShell, in `C:\Users\sande\Downloads\sentinel-detection-engine`):
+On your local machine (PowerShell, in `<your-clone-dir>`):
 
 ```powershell
 gh auth login          # if not already
@@ -106,26 +106,36 @@ gh repo create sentinel-detection-engine --public --source=. --push --descriptio
 
 ### 3.2  Connect Sentinel to the GitHub repo (GitOps)
 
+The connection deploys **ARM templates**, so point the content types at the generated folders:
+`deploy/analytic-rules` for the rules and `deploy/hunting-queries` for the hunts. Pointing
+"Analytic rules" at `Detections/` does not work — that folder holds the authoring YAML.
+
 1. Sentinel → **Repositories** (left nav, under Configuration)
 2. **Add new** → **GitHub** → authorise
 3. Repository: `sandeepmothukuri/sentinel-detection-engine`
 4. Branch: `main`
-5. Content types: leave defaults (Analytic rules, Hunting queries, Workbooks, Playbooks)
+5. Set the content types to: Analytics rules → `deploy/analytic-rules`; Hunting queries →
+   `deploy/hunting-queries`. Add Workbooks and Playbooks once you have wrapped the workbook in an
+   ARM template (the playbooks already are).
 6. **Add**
 
-Sentinel runs a GitHub Actions deployment from your repo. Watch:
+Sentinel then creates a deployment workflow in your repository and runs it on each commit.
+Watch it with:
 
 ```powershell
 gh run watch   # in your repo dir
 ```
 
 Within ~3–5 min:
-- Sentinel → **Analytics** → 12 new rules
+- Sentinel → **Analytics** → 18 new rules
 - Sentinel → **Hunting** → 10 new queries
-- Sentinel → **Workbooks** → L3 Triage Dashboard
+- Sentinel → **Workbooks** → L3 Triage Dashboard (once wrapped in ARM)
+
+Every later push re-syncs: the repository becomes the source of truth, and portal edits to
+connected content are overwritten on the next run.
 
 **📸 Screenshot #3 — `03-analytics-rules.png`**
-Sentinel → **Analytics** → **Active rules** tab — shows your 12 rules listed, enabled.
+Sentinel → **Analytics** → **Active rules** tab — shows your 18 rules listed, enabled.
 
 **📸 Screenshot #4 — `04-attack-navigator.png`** *(do this now while waiting for logs)*
 Open <https://mitre-attack.github.io/attack-navigator/> in a new tab.
@@ -211,14 +221,28 @@ Sentinel → **Workbooks** → **My workbooks** → **L3 Triage Dashboard** → 
 ## Phase 6 — Stash screenshots + update README (2 min)
 
 ```powershell
-cd C:\Users\sande\Downloads\sentinel-detection-engine
-# drop the 7 PNGs into docs/images/
-git add docs/images/*.png
-git commit -m "Add real Sentinel + Navigator screenshots from lab deployment"
+cd <your-clone-dir>
+
+# File each capture under the matching area, with a descriptive name. The directories
+# already exist and hold the generated diagrams:
+#   docs/images/sentinel/    workspace, connectors, analytics-rule list
+#   docs/images/attack/      ATT&CK Navigator with your layer.json loaded
+#   docs/images/detections/  the incident that your atomic produced
+#   docs/images/workbooks/   the L3 dashboard rendering your own data
+git add docs/images
+git commit -m "Add lab screenshots captured after deploying the rule pack"
 git push
 ```
 
-The README already references `docs/images/` — your screenshots will render on GitHub automatically.
+**Register each image before you push it.** Add a row to [`evidence.md`](evidence.md) recording its
+purpose, source, environment, date, what it demonstrates and what you redacted (tenant or
+subscription id, user principal names, addresses, hostnames, tokens). Images without a register entry
+do not belong in the repository: an unlabelled screenshot is exactly what this repository's evidence
+policy exists to prevent.
+
+Once registered, reference the images from the README's screenshot section. The generated diagrams
+are already referenced there; your captures go alongside them, clearly identified as coming from
+your own lab.
 
 ---
 
@@ -233,16 +257,22 @@ Keep the dev tenant — it's free indefinitely.
 
 ---
 
-## Recap — your seven legitimate screenshots
+## Recap — the screenshots that would be legitimate
 
 | # | File | Source | Defensible |
 |---|---|---|---|
 | 1 | `01-sentinel-overview.png` | Your Sentinel workspace | Yes — you set it up |
 | 2 | `02-data-connectors.png` | Your connectors | Yes — you connected them |
-| 3 | `03-analytics-rules.png` | Your 12 rules deployed | Yes — your code |
+| 3 | `03-analytics-rules.png` | Your 18 rules deployed | Yes — your code |
 | 4 | `04-attack-navigator.png` | Navigator + your layer.json | Yes — your coverage data |
 | 5 | `05-incident-list.png` | Real incident on your tenant | Yes — your rule fired on your atomic |
 | 6 | `06-investigation-graph.png` | Same incident's entity graph | Yes |
 | 7 | `07-workbook-live.png` | Your workbook with live data | Yes — your JSON, your data |
 
-Every one of these you can walk an interviewer through. That's the bar.
+Every one of these you can walk an interviewer through, because you produced it. That is the bar —
+and it is why this repository ships none of them: a screenshot taken from a tenant that does not
+exist would be a fabrication, and a redacted capture from a real workspace with real telemetry is
+worth more than every diagram in `docs/images/` put together.
+
+Until you capture them, the repository stands on what it can prove: 28 validated rule files, 31
+upstream-verified atomic citations, and a build that fails when any of it drifts.

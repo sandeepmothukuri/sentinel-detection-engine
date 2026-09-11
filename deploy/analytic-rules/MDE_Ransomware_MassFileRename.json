@@ -1,0 +1,97 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-mderansomwaremassfilerename-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a0e",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'MDE - Ransomware-Style Mass File Rename Per Device'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-mderansomwaremassfilerename-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "MDE - Ransomware-Style Mass File Rename Per Device",
+        "description": "Detects a device renaming an unusually large number of files to a different\nextension inside a short window — the encryption pass of a ransomware\npayload. Aggregating rename volume per device (rather than alerting per file)\nkeeps the alert count at one per infected host and survives the low-and-slow\nvariants that throttle encryption to stay under per-process thresholds.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "let rename_threshold = 300;\nlet bucket = 15m;\nDeviceFileEvents\n| where TimeGenerated > ago(1h)\n| where ActionType == \"FileRenamed\"\n| extend OldExt = tolower(tostring(extract(@\"\\.([A-Za-z0-9]{1,10})$\", 1, PreviousFileName)))\n| extend NewExt = tolower(tostring(extract(@\"\\.([A-Za-z0-9]{1,10})$\", 1, FileName)))\n// An encryption pass changes the extension. A move or a folder rename keeps\n// it, so requiring a *change* removes most of the routine rename noise.\n| where isnotempty(NewExt) and NewExt != OldExt\n| summarize RenamedFiles = dcount(FileName),\n            NewExtensions = make_set(NewExt, 10),\n            ExampleFiles = make_set(FileName, 10),\n            Folder = any(FolderPath),\n            FirstRename = min(TimeGenerated),\n            LastRename = max(TimeGenerated)\n          by DeviceId, DeviceName, AccountName, bin(TimeGenerated, bucket)\n| where RenamedFiles >= rename_threshold\n| extend RenamesPerSecond = round(RenamedFiles / (bucket / 1s), 2)\n// Sentinel cannot entity-map an array (make_set) column, so project a single\n// representative file path as a scalar for the File entity.\n| extend ExampleFile = tostring(ExampleFiles[0])\n| project TimeGenerated = FirstRename, LastRename, DeviceId, DeviceName,\n          AccountName, RenamedFiles, RenamesPerSecond, NewExtensions,\n          ExampleFile, Folder\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1486"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "DeviceName"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "AccountName"
+              }
+            ]
+          },
+          {
+            "entityType": "File",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "ExampleFile"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT12H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Host"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Mass file rename on {{DeviceName}} ({{RenamedFiles}} files)",
+          "alertDescriptionFormat": "{{RenamedFiles}} files were renamed to a different extension on {{DeviceName}} under account {{AccountName}} within 15 minutes — consistent with a ransomware encryption pass."
+        }
+      }
+    }
+  ]
+}

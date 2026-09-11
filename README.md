@@ -1,115 +1,362 @@
 # sentinel-detection-engine
 
-**Enterprise Microsoft Sentinel Detection-as-Code and SOC Engineering Lab** — a curated, CI-validated detection pack: 12 scheduled analytics rules, 10 hypothesis-driven hunting queries, 4 SOAR playbooks, an L3 triage workbook, auto-generated ATT&CK Navigator coverage, and an Atomic Red Team validation ledger.
-
-**Author:** Sandeep Mothukuri — SOC L3 / Detection Engineering
-**Repo:** [`sandeepmothukuri/sentinel-detection-engine`](https://github.com/sandeepmothukuri/sentinel-detection-engine)
+**Detection-as-code for Microsoft Sentinel and Microsoft Defender XDR** — 18 scheduled analytics
+rules, 10 hypothesis-driven hunting queries, 4 SOAR playbooks behind explicit safety gates, an L3
+triage workbook, generated ATT&CK coverage, a validation ledger that cites real Atomic Red Team
+tests, and the full L3 SOC workflow documentation to go with them.
 
 [![validate](https://github.com/sandeepmothukuri/sentinel-detection-engine/actions/workflows/validate.yml/badge.svg)](https://github.com/sandeepmothukuri/sentinel-detection-engine/actions/workflows/validate.yml)
-![rules](https://img.shields.io/badge/rules-12_analytics_%2B_10_hunts-2776d6)
-![attack](https://img.shields.io/badge/ATT%26CK-31_techniques_validated-ff5a72)
-![tests](https://img.shields.io/badge/pytest-22_tests_passing-2ea043)
-![sentinel](https://img.shields.io/badge/Microsoft-Sentinel-0078d4)
-![license](https://img.shields.io/badge/license-MIT-green)
+
+> **Validation status: nothing in this repository has been executed against a live tenant.**
+> Every rule is at `STATIC VALIDATION` — it passes schema, KQL lint, ATT&CK coherence,
+> telemetry-to-connector parity and metadata checks in CI, and that is all. No incident numbers,
+> detection rates, MTTA/MTTR figures or screenshots of a live workspace appear anywhere in this
+> repository, because none exist. See [validation](#11-validation-methodology) and
+> [`tests/atomics.md`](tests/atomics.md).
 
 ---
 
-## What this is (and is not)
+## 1. Overview
 
-- **Is:** a detection-as-code repository with a strict validation pipeline — schema, KQL lint, real ATT&CK validation against MITRE CTI, telemetry/connector cross-checks, tuning metadata, and a pytest suite — plus the SOC workflow docs an L3 analyst expects.
-- **Is not (yet):** a pack with live-tenant validation results. Every rule is at **STATIC VALIDATION**: CI proves structure and consistency, but no rule has been fired against a live Sentinel tenant by the author. The [validation ledger](tests/atomics.md) records this openly and defines exactly how to change it. No screenshots or statistics in this repo are fabricated.
-
-## Architecture
-
-```
-rules + hunts (YAML) ──▶ CI validate ──▶ deploy (GitOps / manual / tarball) ──▶ Sentinel
-        │                  │  schema · ATT&CK (MITRE CTI) · telemetry tables │
-        │                  │  KQL lint · pytest · links · gitleaks            ▼
-        │                                                            incidents
-        └── docs ◀── tuning loop ◀── workbook KPIs ◀──────────────────────┤
-                                            SOAR playbooks (gated) ◀──────┘
-```
-
-## Detection inventory (12)
-
-| Family | Rules | Tables |
-|---|---|---|
-| Entra ID | [Impossible Travel](Detections/EntraID_ImpossibleTravel.yaml) · [MFA Fatigue](Detections/EntraID_MFAFatigue.yaml) · [Legacy Auth Success](Detections/EntraID_LegacyAuthSuccess.yaml) · [SP Credential Added](Detections/EntraID_ServicePrincipalCredAdd.yaml) | `SigninLogs`, `AuditLogs` |
-| Microsoft 365 | [Inbox Rule Exfil](Detections/M365_InboxRuleExfil.yaml) · [Mass SharePoint Download](Detections/M365_MassSharePointDownload.yaml) · [OAuth Illicit Consent](Detections/M365_OAuthConsentSuspiciousApp.yaml) | `OfficeActivity`, `AuditLogs` |
-| Endpoint (MDE) | [rundll32 + Network](Detections/MDE_LOLBin_Rundll32_Network.yaml) · [mshta Remote Script](Detections/MDE_MSHTA_RemoteScript.yaml) · [PowerShell EncodedCommand](Detections/MDE_PowerShell_EncodedCommand.yaml) | `DeviceProcessEvents`, `DeviceNetworkEvents` |
-| Azure | [NSG Open to Internet](Detections/Azure_NSG_OpenToInternet.yaml) · [Key Vault Access Spike](Detections/Azure_KeyVault_SecretAccessSpike.yaml) | `AzureActivity`, `AzureDiagnostics` |
-
-Every rule ships with: entity mappings, incident grouping configuration, false-positive analysis, tuning guidance with named thresholds, suppression policy, expected volume, and version — see [detection-development.md](docs/detection-development.md).
-
-## Hunting (10)
-
-Hypothesis-driven hunts with structured metadata (hypothesis, required telemetry, expected findings, investigation steps, escalation, limitations): [first-seen ASN per user](Hunting%20Queries/HUN_FirstSeenASN_PerUser.yaml), [datacenter-ASN sign-ins](Hunting%20Queries/HUN_SignInFromDatacenterASN.yaml), [mailbox forwarding](Hunting%20Queries/HUN_AnomalousMailboxForwarding.yaml), [guest → privileged role](Hunting%20Queries/HUN_GuestUserInvitedToPrivilegedGroup.yaml), [scheduled-task persistence](Hunting%20Queries/HUN_NewScheduledTask.yaml), [Office spawning interpreters](Hunting%20Queries/HUN_OfficeChildProcess.yaml), [rare processes estate-wide](Hunting%20Queries/HUN_RareProcessPerDevice.yaml), [unsigned binaries from %TEMP%](Hunting%20Queries/HUN_UnsignedBinaryFromTemp.yaml), [dynamic-DNS C2](Hunting%20Queries/HUN_DNSRequestsToFreeDynamicDomains.yaml), [workstation SSH/RDP fan-out](Hunting%20Queries/HUN_NewSSHConnectionFromInternal.yaml).
-
-## ATT&CK coverage
-
-The [Navigator layer](attack-navigator/layer.json) and [coverage.md](coverage.md) are **generated from rule metadata** — 31 unique techniques. Every technique id is validated against a dataset built from official MITRE CTI (revoked/deprecated excluded, v18 vocabulary normalised); a stale id fails CI. Details: [docs/ATTACK.md](docs/ATTACK.md).
-
-![ATT&CK Navigator coverage](docs/images/04-attack-navigator.png)
-
-## CI/CD
-
-Three workflows: [validate](.github/workflows/validate.yml) (yamllint, gitleaks, rule validation, pytest, link check, coverage-drift check, GitOps packaging), [pr-detection-report](.github/workflows/pr-detection-report.yml) (sticky PR comment: added/modified/deleted rules, severity/tactic/technique/query diffs, version-bump warnings), and [release](.github/workflows/release.yml) (tagged tarball + SHA-256 + changelog).
-
-## Atomic Red Team
-
-Each detection maps to [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team) tests or a documented manual procedure in the [validation ledger](tests/atomics.md). The ledger uses four statuses — `VALIDATED IN LIVE TENANT`, `SIMULATED`, `STATIC VALIDATION`, `NOT YET VALIDATED` — and currently every entry is `STATIC VALIDATION`. Nothing is claimed as fired that wasn't.
-
-## SOAR
-
-Four playbooks with a hard safety model — severity gates, confidence thresholds, exclusion/allow-lists, IP-count ceilings, single-flight concurrency, audit comments on every path including no-action, and embedded rollback: [AutoEnrichDisableUser](Playbooks/AutoEnrichDisableUser/README.md) · [IsolateDeviceMDE](Playbooks/IsolateDeviceMDE/README.md) · [BlockIPAzureFirewall](Playbooks/BlockIPAzureFirewall/README.md) · [CreateServiceNowTicket](Playbooks/CreateServiceNowTicket/README.md). Design rationale: [docs/SOAR.md](docs/SOAR.md).
-
-## Workbook
-
-[L3 Triage Dashboard](Workbooks/L3-Triage-Dashboard.json) — incident KPIs, severity donut, top firing rules, daily detection trend, tactic distribution, top entities, MTTA/MTTR, **tuning indicators** (rules with the highest benign-positive closure rate), and the open-incident queue.
-
-<details open>
-<summary><strong>Dashboard preview</strong> — static render; deploy the JSON to Microsoft Sentinel for live data</summary>
-
-![L3 Triage Dashboard mockup](docs/images/00-dashboard-mockup.png)
-
-Interactive version: [docs/dashboard-preview.html](docs/dashboard-preview.html) — GitHub serves HTML files as source, not rendered; clone and open it in a browser.
-
-</details>
-
-## Deployment
-
-Three paths, documented in [docs/deployment.md](docs/deployment.md): Sentinel Repositories (GitOps — CI publishes a schema-clean copy via `scripts/package_rules.py`), manual import, and release tarballs. Includes connector enablement, least-privilege roles per playbook identity, and secret handling. Free-tier quickstart: [docs/30-minute-walkthrough.md](docs/30-minute-walkthrough.md) · [docs/free-tier-setup.md](docs/free-tier-setup.md).
-
-## Documentation
-
-[Architecture](docs/architecture.md) · [Deployment](docs/deployment.md) · [Detection development](docs/detection-development.md) · [Testing](docs/testing.md) · [Tuning](docs/tuning.md) · [Triage](docs/triage.md) · [SOAR](docs/SOAR.md) · [ATT&CK](docs/ATTACK.md) · [Data sources](docs/data-sources.md) · [Troubleshooting](docs/troubleshooting.md) · [Metrics](docs/metrics.md) — plus the workflow pack: [IR runbook](docs/workflows/ir-runbook.md), [triage SOP](docs/workflows/triage-sop.md), [escalation matrix](docs/workflows/escalation-matrix.md), [SOAR decision flow](docs/workflows/soar-decision-flow.md), [tuning log](docs/workflows/tuning-log.md), [maturity assessment](docs/workflows/maturity-assessment.md).
-
-## Validation status at a glance
-
-| Check | Status |
+| | |
 |---|---|
-| Schema / metadata validation (22 rules) | Passing |
-| ATT&CK validation (MITRE CTI dataset) | Passing |
-| KQL lint | Passing |
-| pytest suite | 22/22 passing |
-| Live-tenant validation | Not yet performed — see [testing.md](docs/testing.md) |
+| **Scope** | Microsoft Sentinel detection engineering: Entra ID, Microsoft 365, Defender for Endpoint, Azure control plane and Key Vault |
+| **Detections** | 18 scheduled analytics rules |
+| **Hunting queries** | 10, each with a stated hypothesis, required telemetry, expected findings and limitations |
+| **Response automation** | 4 playbooks, all behind a confidence threshold, an allowlist and a rollback path |
+| **Reporting** | L3 triage workbook (13 panels), generated ATT&CK coverage, static HTML dashboard preview |
+| **ATT&CK coverage** | 37 unique techniques across 12 of the 14 enterprise tactics |
+| **Validation** | 28 ledger entries; 31 cited atomic test references verified to exist upstream; 14 rules with a written manual procedure where no atomic can exercise them |
+| **Quality gates** | 15 check families in `scripts/ci_validate.py`, 124 tests, 4 CI drift gates, secret scanning, SHA-pinned actions |
+| **Author** | Sandeep Mothukuri |
 
-## Limitations
+## 2. Why this exists
 
-- No rule has produced a live incident in a verified tenant; KQL is linted, not executed by CI.
-- `validationStatus` claims must match evidence; the ledger and YAML statuses are CI-checked for vocabulary, and honesty is enforced by review.
-- The Sigma → KQL converter handles a documented subset (four categories, bounded conditions) and fails loudly outside it — it is not a pySigma replacement.
-- ATT&CK dataset is refreshed manually (`scripts/build_attack_data.py`).
+Most detection repositories are a folder of queries: they look plausible, they never say whether
+they work, and nothing stops them from drifting away from the techniques they claim to cover.
+This one is built around three ideas.
 
-## Roadmap
+**A rule that has not been tested is a hypothesis, not a detection.** Every rule carries a
+`validationStatus`, and the ledger records how it *would* be exercised — a specific upstream
+atomic test where one exists, and a written manual procedure where one does not, with an
+explanation of why. The ledger is machine-checked: a cited atomic that does not exist upstream
+fails the build.
 
-Only items that remain open; completed work is reflected in the repo itself.
+**Coverage claims should be generated, never typed.** `coverage.md` and
+`attack-navigator/layer.json` are produced from rule metadata by a script, and CI fails on any
+diff. A hand-written coverage number is a claim; a generated one is a fact about the repository.
 
-- [ ] Live-tenant validation: execute the atomic ledger and move rules to `VALIDATED IN LIVE TENANT` / `SIMULATED`
-- [ ] Record measured precision/FP-rate per rule in [docs/metrics.md](docs/metrics.md) after 30 days of live data
-- [ ] AWS GuardDuty / CloudTrail analog pack
-- [ ] Defender for Cloud Apps (MCAS) coverage
+**Nothing destructive happens because a query returned rows.** Account disable, device isolation
+and IP blocking sit behind a confidence threshold, independent corroboration, a safety gate that
+checks for privileged accounts and allowlists, and a documented rollback — see
+[`docs/SOAR.md`](docs/SOAR.md).
 
-## License
+## 3. Architecture
 
-[MIT](LICENSE)
+![Logical architecture](docs/images/architecture/01-logical-architecture.png)
+
+*Diagram source: `docs/diagrams/architecture/01-logical-architecture.mmd`. Image provenance for
+every picture in the repository is recorded in [`docs/evidence.md`](docs/evidence.md).*
+
+Telemetry flows from four source families through five connectors into nine Log Analytics tables;
+18 rules and 10 hunts read those tables; alerts become entity-mapped incidents; incidents reach
+analysts through the workbook and the triage SOP, and reach automation only through the SOAR
+safety gate. Everything above the workspace — rules, hunts, playbooks, workbooks, scripts, docs —
+is source-controlled and gated by CI.
+
+![Telemetry to detection flow](docs/images/architecture/02-telemetry-to-detection-flow.png)
+
+## 4. Detection inventory
+
+| Rule | Name | Severity | Tactics | Techniques | Schedule |
+|---|---|---|---|---|---|
+| `EntraID_ImpossibleTravel` | Entra ID - Impossible Travel Between Sign-Ins | High | InitialAccess, CredentialAccess | T1078.004, T1539 | 1h / 6h |
+| `EntraID_MFAFatigue` | Entra ID - MFA Fatigue Followed by Success | High | CredentialAccess, InitialAccess | T1621, T1110.003 | 30m / 1h |
+| `EntraID_LegacyAuthSuccess` | Entra ID - Successful Legacy Auth Sign-In | High | InitialAccess, DefenseEvasion, CredentialAccess | T1110, T1078.004 | 1h / 1h |
+| `EntraID_ServicePrincipalCredAdd` | Entra ID - Service Principal Credential Added | High | Persistence, PrivilegeEscalation | T1098.001 | 1h / 1h |
+| `EntraID_PrivilegedRoleAssignment` | Entra ID - Privileged Role Granted to User or Service Principal | Medium | Persistence, PrivilegeEscalation | T1098.003 | 1h / 1h |
+| `M365_InboxRuleExfil` | M365 - Suspicious Inbox Rule (Forward / Delete) | High | Collection, Exfiltration, DefenseEvasion | T1114.003, T1564.008 | 1h / 1h |
+| `M365_OAuthConsentSuspiciousApp` | M365 - OAuth Consent to High-Risk Scopes | High | InitialAccess, Persistence, CredentialAccess | T1528, T1098.001 | 1h / 1h |
+| `M365_MassSharePointDownload` | M365 - Mass SharePoint / OneDrive Download | Medium | Collection, Exfiltration | T1213.002, T1567.002 | 1h / 14d |
+| `MDE_PowerShell_EncodedCommand` | MDE - PowerShell EncodedCommand With Long Payload | High | Execution, DefenseEvasion | T1059.001, T1027 | 1h / 1h |
+| `MDE_MSHTA_RemoteScript` | MDE - mshta Executing Remote Script | High | DefenseEvasion, Execution | T1218.005 | 1h / 1h |
+| `MDE_LOLBin_Rundll32_Network` | MDE - rundll32 With External Network Connection | High | DefenseEvasion, Execution, CommandAndControl | T1218.011, T1071.001 | 1h / 1h |
+| `MDE_PsExec_ServiceExecution` | MDE - PsExec-Style Service Execution | Medium | LateralMovement, Execution | T1569.002, T1021.002 | 1h / 1h |
+| `MDE_WinRM_RemoteExecution` | MDE - WinRM Remote Command Execution | Medium | LateralMovement, Execution | T1021.006 | 1h / 1h |
+| `MDE_ShadowCopyDeletion` | MDE - Shadow Copy / Recovery Inhibited | High | Impact | T1490 | 1h / 1h |
+| `MDE_Ransomware_MassFileRename` | MDE - Ransomware-Style Mass File Rename Per Device | High | Impact | T1486 | 1h / 1h |
+| `Azure_NSG_OpenToInternet` | Azure - NSG Rule Opens Port to 0.0.0.0/0 | High | InitialAccess, DefenseEvasion | T1190, T1686.001 | 1h / 1h |
+| `Azure_KeyVault_SecretAccessSpike` | Azure - Key Vault Secret Access Spike Per Identity | High | CredentialAccess, Discovery | T1555.005, T1087.004 | 1h / 14d |
+| `Azure_KeyVault_AccessControlChange` | Azure - Key Vault Access Policy or Network ACL Modified | High | Persistence, PrivilegeEscalation, DefenseEvasion | T1098, T1686.001 | 1h / 1h |
+
+Every rule carries `metadata.falsePositives`, `metadata.tuningGuidance`, `metadata.suppression`,
+`metadata.expectedVolume`, an entity mapping and an `alertDetailsOverride` so that alerts render a
+readable name instead of repeating the rule title. Thresholds are named `let` bindings at the top
+of each query; nothing is buried in a `where` clause.
+
+Adding a rule means updating the ledger in the same pull request. CI fails otherwise.
+
+## 5. Hunting inventory
+
+| Query | Name | Techniques |
+|---|---|---|
+| `HUN_AnomalousMailboxForwarding` | HUN - Mailbox Forwarding to External Domain | T1114.003 |
+| `HUN_FirstSeenASN_PerUser` | HUN - First-Seen ASN per User (30-day baseline) | T1078.004 |
+| `HUN_SignInFromDatacenterASN` | HUN - Sign-In From Hosting / Datacenter ASN | T1078.004, T1090.003 |
+| `HUN_GuestUserInvitedToPrivilegedGroup` | HUN - Guest User Added To Privileged Role / Group | T1098.003, T1136.003 |
+| `HUN_NewScheduledTask` | HUN - New Scheduled Task With Script Action | T1053.005 |
+| `HUN_OfficeChildProcess` | HUN - Office Apps Spawning Script Interpreters | T1566.001, T1059 |
+| `HUN_RareProcessPerDevice` | HUN - Rare Process Per Device (org-wide rarity) | T1059, T1027 |
+| `HUN_UnsignedBinaryFromTemp` | HUN - Unsigned Binary Execution From Temp/AppData | T1204.002, T1027 |
+| `HUN_DNSRequestsToFreeDynamicDomains` | HUN - DNS Queries to Free / Dynamic / Tunneling TLDs | T1071.004, T1568.002 |
+| `HUN_NewSSHConnectionFromInternal` | HUN - Lateral SSH/RDP From Workstation | T1021.001, T1021.004 |
+
+Hunts carry `hypothesis`, `requiredTelemetry`, `expectedFindings`, `investigationSteps`,
+`escalation` and `limitations`. A hunt that finds nothing is still a result: the workflow in
+[the hunt workflow diagram](docs/diagrams/hunting/01-hunt-to-detection-workflow.mmd) sends negative
+results to the telemetry-gap register rather than deleting them.
+
+![Hunt to detection workflow](docs/images/hunting/01-hunt-to-detection-workflow.png)
+
+## 6. ATT&CK coverage
+
+![ATT&CK coverage by tactic](docs/images/attack/01-attack-coverage-by-tactic.png)
+
+- **37 unique techniques**, **12 of 14 enterprise tactics** — see [`coverage.md`](coverage.md)
+- Generated from rule metadata; CI fails if `coverage.md` or `attack-navigator/layer.json` is stale
+- Techniques validated against a vendored MITRE CTI dataset (697 active techniques; retired ids
+  rejected), currently the **v19** matrix in which Defense Evasion was replaced by Stealth (TA0005)
+  and Defense Impairment (TA0112)
+- Load [`attack-navigator/layer.json`](attack-navigator/layer.json) in the
+  [ATT&CK Navigator](https://mitre-attack.github.io/attack-navigator/)
+
+Reconnaissance and Resource Development have no coverage, and that is stated rather than hidden:
+both describe activity on infrastructure the defender does not own. Full reasoning in
+[`docs/ATTACK.md`](docs/ATTACK.md).
+
+## 7. Telemetry
+
+![Connector and table coverage](docs/images/sentinel/01-connector-table-coverage.png)
+
+| Connector | Tables | Rules |
+|---|---|---|
+| Microsoft Entra ID | `SigninLogs`, `AuditLogs` | 5, 4 |
+| Office 365 | `OfficeActivity` | 3 |
+| Microsoft Defender XDR | `DeviceProcessEvents`, `DeviceFileEvents`, `DeviceNetworkEvents`, `DeviceInfo` | 10, 1, 3, 1 |
+| Azure Activity | `AzureActivity` | 2 |
+| Key Vault diagnostic settings | `AzureDiagnostics` | 1 |
+
+Every table a query reads must be declared in `requiredDataConnectors` — checked against a
+curated table catalog in CI, so a rule cannot silently depend on telemetry the deployment does not
+provision. Table-level detail, retention and prerequisites: [`docs/data-sources.md`](docs/data-sources.md).
+
+## 8. SOAR
+
+![SOAR safety gate](docs/images/soar/01-soar-safety-gate-flow.png)
+
+Four playbooks: `AutoEnrichDisableUser`, `IsolateDeviceMDE`, `BlockIPAzureFirewall`,
+`CreateServiceNowTicket`. The destructive three share one rule: **a query result alone never
+triggers a destructive action.** Each takes a confidence threshold parameter (default 80), a
+minimum severity, and an allowlist, and each documents its verification step and rollback path.
+The flow is Detection → Confidence → Independent validation → Safety gate → Action → Verification →
+Audit → Rollback. Details and parameter semantics: [`docs/SOAR.md`](docs/SOAR.md).
+
+## 9. CI/CD
+
+![Validation pipeline](docs/images/ci-cd/01-validation-pipeline.png)
+
+Every push and pull request runs:
+
+| Gate | What it rejects |
+|---|---|
+| `gitleaks` | Any committed secret. Never disabled, never `continue-on-error`. |
+| `yamllint` | Malformed rule, hunt and workflow YAML |
+| `scripts/ci_validate.py` | 15 check families: schema, UUID, uniqueness, severity, status, `kind`, scheduling bounds, ATT&CK ids and tactic coherence, table↔connector parity, entity identifiers, alert-detail placeholders, metadata quality bar, placeholder text, KQL lint, explicit `ago()` bound, `TimeGenerated` retained by the final projection, and the whole validation ledger |
+| `pytest` | 124 tests in eight modules: 28 rule tests, 33 negative tests that prove the validator rejects bad input, 23 ledger tests, 16 tests of the generated deployment templates, 3 tests of the numbers drawn inside diagrams, 9 backtesting-contract tests, 7 Sigma converter tests, 5 tests that fail if a documented number drifts |
+| `scripts/check_links.py` | Broken relative links in documentation |
+| Drift ×4 | `coverage.md`, `attack-navigator/layer.json`, `tests/atomics.md`, `deploy/` and the workbook design preview must match what the generators produce |
+| `scripts/generate_arm_templates.py` | Regenerates `deploy/` — the ARM templates a Sentinel Repositories connection actually consumes — from the rule files |
+| `scripts/package_rules.py` | Produces the metadata-stripped YAML artefact for manual import |
+
+Security posture: `permissions: contents: read` at workflow level, write scope only on the job
+that publishes a release or posts a PR comment; all actions pinned to commit SHAs with a weekly
+Dependabot job keeping the pins current; `pull_request_target` is not used; pull-request code runs
+in a read-only job and its report is handed to a separate comment job through an artefact; shell
+steps receive `github` values through the environment rather than inline interpolation.
+Release: [`release.yml`](.github/workflows/release.yml) re-runs the entire validation workflow as
+its gate before publishing a signed-checksum archive.
+
+## 10. Testing
+
+124 tests, no network access required, under eight seconds.
+
+| Suite | What it covers |
+|---|---|
+| `tests/test_rules.py` | Loads every rule and hunt; asserts CI validation passes, counts, uniqueness, entity-mapping validity, schedule limits, connector parity, alert-detail placeholders, metadata quality, honest validation status, and regression tests for three shipped defects (inbox-rule parameter casing, `isnotempty` on a numeric cast, array columns in entity mappings) |
+| `tests/test_validation.py` | The ledger: one entry per rule, closed status vocabulary, cited atomics exist upstream, partial mappings explain their gap, no validation claim without a dated evidence file, generator output current, plus nine negative tests that feed a broken ledger in and assert the specific failure |
+| `tests/test_validator_negative.py` | 33 negative tests for the validator itself — a rule with a 30-day period, an undeclared connector, a mismatched technique, a dropped `TimeGenerated`, invalid KQL, placeholder text and AI-style author attribution must each fail with the right message |
+| `tests/test_arm_templates.py` | The deployable artefact: every rule and hunt has a template, no property outside the alert-rule schema is emitted, the `metadata:` authoring block never leaks into a template, the resource name derives from the committed rule id so a re-sync updates rather than duplicates, and the converter refuses what it does not understand |
+| `tests/test_backtest.py` | The backtesting contract: plan-only runs execute nothing and write nothing, a run without a workspace fails instead of producing a placeholder, and every query rewrite is reported |
+| `tests/test_diagrams.py` | The numbers printed inside diagram sources — per-table rule counts and the detection inventory — must match the rule files |
+| `tests/test_documented_numbers.py` | Fails the build when a rule, hunt, ledger entry, image, component or test count quoted in the README or `docs/testing.md` no longer matches the repository |
+
+A validator that has never rejected anything is untested, which is why the negative suite exists
+and why one of its tests asserts that a rule claiming an invalid status fails with an actionable
+error message.
+
+## 11. Validation methodology
+
+![Rule development lifecycle](docs/images/detections/01-rule-development-lifecycle.png)
+
+Four statuses, defined in [`tests/validation/validation-schema.yaml`](tests/validation/validation-schema.yaml):
+
+| Status | Meaning | Enforced requirement |
+|---|---|---|
+| `STATIC VALIDATION` | Passes CI; nothing executed | — |
+| `SIMULATED` | Exercised against deliberately produced telemetry outside production | Dated evidence file |
+| `VALIDATED IN LIVE TENANT` | Fired on real telemetry in an authorised tenant, incident reviewed by a human | Dated evidence file **and** an incident reference |
+| `NOT YET VALIDATED` | In the repository but not yet statically validated | A stated reason |
+
+**Current state: 28 of 28 entries at `STATIC VALIDATION`.** 14 rules cite atomic tests that were
+verified to exist upstream (31 references: 24 `trigger`, 3 `precondition`, 4 `partial`), and 14
+have a written manual procedure because no atomic produces the telemetry they need. Mappings that
+were considered and *refused* are recorded with their reasoning in the schema file — for example
+T1528's atomics steal Azure Functions tokens and do not produce an OAuth consent grant, so citing
+them would claim a validation that cannot happen.
+
+Procedure for changing a status: [`tests/validation/live-validation-guide.md`](tests/validation/live-validation-guide.md).
+Record format: [`tests/validation/evidence-template.md`](tests/validation/evidence-template.md).
+Current view: [`tests/atomics.md`](tests/atomics.md).
+
+**Backtesting interface.** `scripts/backtest_rule.py` answers *"what would this rule have produced
+if it had been deployed 30 days ago?"* against a workspace you can query through the Azure CLI. It
+plans before it runs, refuses to execute without a workspace, reports every `ago()` bound it widens,
+and writes a report that labels itself a backtest observation rather than a validation. No backtest
+output exists in this repository, because there is no workspace to query — see
+[`tests/validation/backtests/README.md`](tests/validation/backtests/README.md).
+
+## 12. Deployment
+
+| Step | Where |
+|---|---|
+| Prerequisites, free-tier lab setup | [`docs/free-tier-setup.md`](docs/free-tier-setup.md) |
+| Connectors and permissions | [`docs/deployment.md`](docs/deployment.md) |
+| Import rules (GitOps, portal import, CLI) | [`docs/deployment.md`](docs/deployment.md), generated templates in [`deploy/`](deploy/README.md) |
+| Deploy playbooks | [`docs/SOAR.md`](docs/SOAR.md) |
+| Deploy the workbook | [`docs/deployment.md`](docs/deployment.md) |
+| 30-minute guided walkthrough | [`docs/30-minute-walkthrough.md`](docs/30-minute-walkthrough.md) |
+
+Content is portal-agnostic. Note the platform direction: **after 31 March 2027 Microsoft Sentinel
+will be supported only in the Microsoft Defender portal**, so deployment and triage guidance
+targets the Defender portal with Azure-portal paths kept as compatibility notes.
+
+Read [`docs/production-readiness.md`](docs/production-readiness.md) before deploying anything into
+an environment that matters. It lists what must be configured by you, what has never been
+executed, and the gates that have to pass first.
+
+## 13. Screenshots and diagrams
+
+The repository contains 12 images. **None of them shows a live tenant**, and none contains
+invented incident numbers, alert counts, user names or hostnames.
+
+| Image | Kind |
+|---|---|
+| Architecture, telemetry flow, connector coverage, rule lifecycle, rule anatomy, hunt workflow, SOAR gate, CI pipelines | Diagrams generated from Mermaid source in `docs/diagrams/` |
+| ATT&CK coverage chart | Chart generated from `attack-navigator/layer.json` |
+| L3 workbook design preview | Drawing generated from the workbook definition, carrying the banner *"Design preview — requires deployment to display live telemetry"* and showing `—` where values would appear |
+| ATT&CK Navigator export | Screenshot of the committed layer rendered in Navigator on the author's workstation |
+
+Every image's purpose, source, environment, date, what it demonstrates and what was redacted is
+recorded in [`docs/evidence.md`](docs/evidence.md). There is intentionally no screenshot of an
+analytics-rule blade, an incident queue or a workbook with data: producing one honestly would
+require a live workspace, and there is not one.
+
+![Rule anatomy and its gates](docs/images/detections/02-analytics-rule-anatomy.png)
+
+## 14. Metrics
+
+Every number here is `Not yet measured`. That is the honest state: metrics require a deployed rule
+and closed incidents.
+
+| Metric | Value | Source once deployed |
+|---|---|---|
+| Events evaluated per rule | `Not yet measured` | query result counts |
+| Alerts per rule | `Not yet measured` | `SecurityAlert` |
+| True / false / benign positive counts | `Not yet measured` | `SecurityIncident.Classification` |
+| Precision, false-positive rate | `Not yet measured` | ratio of classified closures |
+| Alert volume per day | `Not yet measured` | `SecurityAlert` by day |
+| Detection latency (event → alert) | `Not yet measured` | `TimeGenerated` vs `StartTime` |
+| MTTA / MTTR | `Not yet measured` | `FirstModifiedTime`, `ClosedTime` |
+| Suppression rate | `Not yet measured` | suppression metadata plus closures |
+| Closure reason | `Not yet measured` | `ClassificationReason` |
+
+The per-rule measurement table, the queries that fill it, the closure-discipline rules and the
+tuning gate (>30% false positives on ≥5 closures) are in
+[`tests/validation/performance-metrics.md`](tests/validation/performance-metrics.md);
+[`docs/metrics.md`](docs/metrics.md) explains why each metric matters and how it is abused.
+The workbook's tuning-candidates panel implements the same gate, so a rule cannot be nominated for
+tuning on the strength of one bad day.
+
+## 15. Limitations
+
+- **Nothing has been executed.** No rule, hunt or playbook in this repository has produced an
+  alert, an incident or an automation run outside CI. The single largest limitation, stated first.
+- **Thresholds are estimates.** Every threshold is defensible and explained, but it was chosen from
+  the behaviour it describes, not from an observed baseline. Expect to tune.
+- **Single author.** No second reviewer has seen this content. CI gates are the compensating
+  control; they are real, and they run on every commit.
+- **Baseline-dependent rules behave differently on day one.** Impossible travel, mass download and
+  Key Vault spike rules need history before they are meaningful.
+- **Threat intelligence is modelled, not implemented.** No MISP or TAXII connector is configured;
+  the integration is described as a future design in [`docs/data-sources.md`](docs/data-sources.md).
+- **Coverage is intent, not efficacy.** A covered technique means a rule exists, not that it fires
+  in your telemetry.
+- **Two tactics are uncovered** by design, and two behaviour families (T1685, host firewall) are
+  only partly covered because they would need telemetry this repository does not assume.
+- **Backtesting has an interface, not a result.** `scripts/backtest_rule.py` runs a rule's query over
+  a historical window, but no window has been queried: there is no workspace here to query.
+- **The automation layer is unexecuted.** Four playbooks depend on resources that exist only in a
+  real tenant. Their ARM templates are parameterised with no defaulted secrets, and none has been
+  deployed.
+
+The limits that follow from these, with what mitigates each one and what would close it, are written
+out in [`docs/limitations.md`](docs/limitations.md).
+
+## 16. Roadmap
+
+**Completed** — the rule pack with its metadata bar; hunting queries with full hunt metadata; four
+playbooks with safety gates; 15-family CI validator; 124-test suite including negative tests;
+generated ATT&CK coverage, validation ledger and ARM deployment templates, all drift-gated;
+evidence register; Microsoft current-state alignment; SHA-pinned CI with least privilege.
+
+**In progress** — coverage of the techniques left uncovered by the v19 Defense Evasion split;
+migrating hand-rolled `stdev` anomaly logic to `series_decompose_anomalies` once there is a tenant
+to calibrate against.
+
+**Environment dependent** — every item that needs a tenant, and which no further code can
+substitute for: executing the cited atomics and the manual procedures; closing incidents so
+precision and false-positive rate become measurable; running the destructive atomics on a
+disposable VM; triggering each playbook with a test incident and recording the rollback.
+
+**Future enhancement** — threat-intelligence enrichment via MISP/TAXII once a real feed exists to
+point at; multi-workspace workbooks; the Sentinel data lake and Defender advanced hunting
+surfaces; additional telemetry families (identity protection risk events, Purview DLP) if and when
+a deployment actually ingests them.
+
+Roadmap items are not decoration: the second and fourth sections are the ones that would move the
+scores in [`docs/production-readiness.md`](docs/production-readiness.md).
+
+## 17. Author
+
+**Sandeep Mothukuri** — detection engineering, Microsoft Sentinel, L3 SOC operations.
+
+Every commit in this repository is authored by the same person. There are no AI or bot
+contributors, no AI-generated content, no fabricated screenshots, no invented incident numbers and
+no purchased or simulated engagement metrics. Components that would be dishonest to fake — live
+detection rates, tenant validation, production incidents — are recorded as
+`Not yet measured` or `Requires live tenant validation` throughout, and CI enforces the fields
+that would otherwise be quietly filled in with something plausible.
+
+## 18. License
+
+MIT — see [`LICENSE`](LICENSE). Copyright (c) 2026 Sandeep Mothukuri.

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "hunt-hunsigninfromdatacenterasn-name": {
+      "type": "string",
+      "defaultValue": "hunsigninfromdatacenterasn",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the hunting query 'HUN - Sign-In From Hosting / Datacenter ASN'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', parameters('hunt-hunsigninfromdatacenterasn-name'))]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "HUN - Sign-In From Hosting / Datacenter ASN",
+        "category": "Hunting Queries",
+        "query": "// AutonomousSystemNumber is a *string* column in SigninLogs (per the Azure\n// Monitor Logs schema). The allow-list must therefore hold strings: an integer\n// list silently matches nothing, because `in` does not coerce int -> string.\nlet dc_asns = dynamic([\"14061\",\"16276\",\"24940\",\"20473\",\"63949\",\"16509\",\"8075\",\"15169\",\n                      \"20454\",\"36352\",\"53667\",\"51852\",\"199524\",\"14618\",\"396982\"]);\nSigninLogs\n| where TimeGenerated > ago(24h)\n| where ResultType == 0\n| where AutonomousSystemNumber in (dc_asns)\n| where AppDisplayName !in (\"Azure Portal\",\"Microsoft Azure CLI\",\"Microsoft Azure PowerShell\")\n| project TimeGenerated, UserPrincipalName, IPAddress, AutonomousSystemNumber,\n          Location, AppDisplayName, UserAgent\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Hypothesis - Legitimate users rarely sign in from VPS / hosting providers. Surface successful sign-ins whose IP belongs to a well-known datacenter ASN (Digital Ocean, OVH, Hetzner, Vultr, Linode, AWS, Azure, GCP, Choopa, ColoCrossing). Usef"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess,DefenseEvasion,CommandAndControl"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078.004,T1090.003"
+          }
+        ]
+      }
+    }
+  ]
+}

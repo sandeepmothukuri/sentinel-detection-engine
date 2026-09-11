@@ -1,0 +1,87 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-entraidmfafatigue-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a02",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'Entra ID - MFA Fatigue Followed by Success'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-entraidmfafatigue-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "Entra ID - MFA Fatigue Followed by Success",
+        "description": "Detects 5+ failed MFA prompts followed by a successful sign-in for the same\nuser within 30 minutes. Classic MFA bombing / push-fatigue pattern used to\nwear down a user until they approve a malicious request.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "let window = 30m;\nlet failed_mfa_threshold = 5;\nlet failures =\n  SigninLogs\n  | where TimeGenerated > ago(1h)\n  | where ResultType in (50074, 50076, 500121, 530002)\n  | summarize FailedMFA = count(), FirstFail = min(TimeGenerated), LastFail = max(TimeGenerated)\n            by UserPrincipalName, IPAddress\n  | where FailedMFA >= failed_mfa_threshold;\nlet success =\n  SigninLogs\n  | where TimeGenerated > ago(1h)\n  | where ResultType == 0\n  | where AuthenticationRequirement == \"multiFactorAuthentication\"\n  | project SuccessTime = TimeGenerated, UserPrincipalName, SuccessIP = IPAddress,\n            AppDisplayName, UserAgent;\nfailures\n| join kind=inner success on UserPrincipalName\n| where SuccessTime between (LastFail .. (LastFail + window))\n| where IPAddress == SuccessIP\n| project TimeGenerated = SuccessTime, FirstFail, LastFail, UserPrincipalName, IPAddress,\n          SuccessIP, FailedMFA, AppDisplayName, UserAgent\n",
+        "queryFrequency": "PT30M",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "CredentialAccess",
+          "InitialAccess"
+        ],
+        "techniques": [
+          "T1621",
+          "T1110.003"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "UserPrincipalName"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "SuccessIP"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "AllEntities"
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "MFA fatigue then success for {{UserPrincipalName}}",
+          "alertDescriptionFormat": "{{UserPrincipalName}} produced {{FailedMFA}} failed MFA prompts from {{IPAddress}} and then approved a prompt from the same address within 30 minutes."
+        }
+      }
+    }
+  ]
+}

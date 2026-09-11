@@ -1,0 +1,491 @@
+# Machine-readable validation ledger.
+#
+# This file is the source of truth for tests/atomics.md, which is generated from
+# it by scripts/generate_atomics_ledger.py and drift-checked in CI.
+#
+# Identity rule: `atomic` is the 1-based index of the test inside the upstream
+# Atomic Red Team YAML for that technique
+# (github.com/redcanaryco/atomic-red-team). Every cited index is verified to
+# exist in scripts/atomic_data.json, a vendored snapshot of that repository, so a
+# citation cannot be invented. Every citation was checked against the upstream
+# command line, not merely against the technique id.
+#
+# Roles:
+#   trigger       executing this atomic should make the rule fire
+#   precondition  required setup for the trigger (enables a service, creates a user)
+#   partial       exercises part of the detection predicate; will NOT reliably fire it
+#
+# Status values are defined in tests/validation/validation-schema.yaml.
+schema_version: "1.0"
+last_reviewed: "2026-09-11"
+source: "github.com/redcanaryco/atomic-red-team"
+
+rules:
+  # --------------------------------------------------------------- Entra ID
+  - rule: EntraID_ImpossibleTravel
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      Sign in to a test account from one VPN egress, then within five minutes sign
+      in again from an egress in a different country. Two interactive sign-ins more
+      than 500 km apart inside the travel window is the trigger. Record both
+      sign-in times and both egress locations.
+    notes: >-
+      No upstream atomic produces Entra ID sign-in telemetry, so this rule cannot
+      be validated with Atomic Red Team. T1078.004's atomics create cloud
+      identities or runbooks, and T1539's atomics steal browser cookies on an
+      endpoint; neither produces the two-sign-in sequence this rule measures.
+
+  - rule: EntraID_MFAFatigue
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      With a test account, drive five or more failed MFA prompts from a single IP
+      address and then one success from the same address inside 30 minutes. An
+      adversary-in-the-middle toolkit in a lab reaches this state fastest; a script
+      issuing sign-ins with a wrong TOTP is the manual equivalent.
+    notes: >-
+      T1621 has no upstream atomics, and T1110.003's password-spray atomics
+      produce failed password sign-ins rather than MFA challenges, which are a
+      different log shape. This rule needs a deliberate sequence.
+
+  - rule: EntraID_LegacyAuthSuccess
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      Authenticate a test mailbox over SMTP AUTH, for example
+      `Send-MailMessage -SmtpServer smtp.office365.com -Port 587 -UseSsl` using an
+      account for which basic auth is still permitted. The resulting
+      ClientAppUsed value is "Other clients; SMTP".
+    notes: >-
+      T1110 has no upstream atomics. The technique this rule really exercises is
+      legacy protocol use rather than password guessing, and it requires a tenant
+      where legacy authentication is not yet blocked — which is the scenario the
+      rule exists to detect.
+
+  - rule: EntraID_ServicePrincipalCredAdd
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1098.001
+        atomic: 1
+        role: trigger
+        note: "Azure AD Application Hijacking - Service Principal: adds a password credential to an existing service principal, which is the UpdateApplication operation the rule matches."
+      - technique: T1098.001
+        atomic: 2
+        role: trigger
+        note: "Azure AD Application Hijacking - App Registration: the same credential addition against an application registration."
+    notes: >-
+      Both atomics need the AzureAD PowerShell module and a privileged test
+      account. Confirm the resulting AuditLogs row carries
+      TargetResources[].modifiedProperties with the credential keys; if the tenant
+      redacts them, the rule will not have enough to alert on and that is a finding
+      about the rule, not the atomic.
+
+  - rule: EntraID_PrivilegedRoleAssignment
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1098.003
+        atomic: 1
+        role: trigger
+        note: "Add-MsolRoleMember -RoleName 'Company Administrator': the audit event reports the role as Global Administrator in current tenants."
+      - technique: T1098.003
+        atomic: 2
+        role: partial
+        note: "Password reset followed by a role addition. The reset produces an unrelated audit event, so only the second half of this test exercises the rule."
+    notes: >-
+      Add-MsolRoleMember is deprecated but still writes an "Add member to role"
+      audit event, which is what the rule matches. Verify on your tenant that
+      Role.DisplayName is populated before relying on the mapping.
+
+  # ------------------------------------------------------------------- M365
+  - rule: M365_InboxRuleExfil
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1114.003
+        atomic: 1
+        role: trigger
+        note: "Office365 - Email Forwarding: runs New-InboxRule -ForwardTo <external>, the exact forwarding predicate the rule keys on."
+      - technique: T1564.008
+        atomic: 1
+        role: trigger
+        note: "New-Inbox Rule to Hide E-mail in M365: New-InboxRule -DeleteMessage, the burying predicate the rule also matches."
+    notes: >-
+      Requires Connect-ExchangeOnline against a test tenant. Confirm the
+      OfficeActivity row for the New-InboxRule operation is present before
+      concluding the rule is broken: the Outlook desktop client produces
+      UpdateInboxRules events with a different shape.
+
+  - rule: M365_MassSharePointDownload
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      Using PnP PowerShell against a test site collection, download 200 or more
+      files inside one hour with `Get-PnPFile` in a loop. The account must have
+      baseline history from the preceding 14 days, otherwise the rule takes the
+      no-baseline branch and the test proves less than intended.
+    notes: >-
+      T1213.002 has no upstream atomics. T1567.002's atomics exfiltrate data to
+      cloud storage with rclone, which is a different data source (endpoint
+      network telemetry, not OfficeActivity) and does not exercise this rule.
+
+  - rule: M365_OAuthConsentSuspiciousApp
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      Register a test application requesting Mail.Read and Files.ReadWrite.All,
+      then grant user consent to it from a test account (myapps → Permissions).
+      Confirm the "Consent to application" audit event carries the
+      ConsentAction.Permissions modified property the rule parses.
+    notes: >-
+      Upstream T1528 atomics cover Azure Functions identity-token theft, not OAuth
+      consent grants, so they are deliberately not cited: citing them would imply a
+      validation that cannot occur. This is the closest the repository gets to a
+      reusable consent-grant test, and it is a manual procedure.
+
+  # --------------------------------------------------------- Endpoint (MDE)
+  - rule: MDE_LOLBin_Rundll32_Network
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1218.011
+        atomic: 1
+        role: trigger
+        note: "Rundll32 execute JavaScript Remote Payload With GetObject: the payload is fetched over HTTPS, so the rundll32 process makes a non-private outbound connection."
+    notes: >-
+      The atomic's destination port must fall inside the rule's suspicious_ports
+      set (80/443/8080/8443/53); HTTPS is 443, so it does. Run on an isolated test
+      host with controlled internet egress. If egress is blocked, the atomic fails
+      before the network event is generated — a blocked test is not a negative
+      result, it is an untested rule.
+
+  - rule: MDE_MSHTA_RemoteScript
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1218.005
+        atomic: 3
+        role: trigger
+        note: "Mshta Executes Remote HTML Application (HTA): an https:// URL on the mshta command line."
+      - technique: T1218.005
+        atomic: 6
+        role: trigger
+        note: "Invoke HTML Application - Direct download from URI: a second remote-URL form of the same command line."
+    notes: >-
+      The rule matches on the command line, so execution does not need to succeed
+      for the alert to fire; blocking egress still validates the detection.
+
+  - rule: MDE_PowerShell_EncodedCommand
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1059.001
+        atomic: 15
+        role: trigger
+        note: "EncodedCommand parameter variations: the canonical encoded-command test."
+      - technique: T1059.001
+        atomic: 16
+        role: trigger
+        note: "EncodedCommand parameter variations with encoded arguments: same executor with an encoded argument list."
+      - technique: T1027
+        atomic: 2
+        role: partial
+        note: "Execute base64-encoded PowerShell: uses -EncodedCommand, but with a short payload the command line may fall under the rule's length floor."
+    notes: >-
+      The rule requires a Base64 payload above a length floor. Check the generated
+      command line length before declaring the rule silent; a short encoded payload
+      is a negative test of the floor, not a failure of the detection.
+
+  - rule: MDE_ShadowCopyDeletion
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1490
+        atomic: 1
+        role: trigger
+        note: "Windows - Delete Volume Shadow Copies: vssadmin delete shadows /all /quiet, the primary command line term the rule matches."
+      - technique: T1490
+        atomic: 2
+        role: trigger
+        note: "Windows - Delete Volume Shadow Copies via WMI: same behaviour through Win32_ShadowCopy, exercising the WMI branch."
+      - technique: T1490
+        atomic: 3
+        role: trigger
+        note: "Windows - wbadmin Delete Windows Backup Catalog: destroys the backup catalog, the second recovery-inhibiting term."
+      - technique: T1490
+        atomic: 4
+        role: trigger
+        note: "Windows - Disable Windows Recovery Console Repair: bcdedit recoveryenabled no."
+      - technique: T1490
+        atomic: 13
+        role: trigger
+        note: "Windows - Delete Volume Shadow Copies via Diskshadow: a less common binary doing the same thing, which tests the term list rather than the executable list."
+    notes: >-
+      Destructive to the test host's recovery state by design. Run on a disposable
+      virtual machine and snapshot it first.
+
+  - rule: MDE_Ransomware_MassFileRename
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1486
+        atomic: 10
+        role: partial
+        note: "Akira Ransomware drop Files with .akira Extension and Ransomnote: writes 100 new files and a ransom note, and never renames anything, so it does not produce the FileRenamed events this rule counts. Useful for confirming that file telemetry reaches the workspace."
+    manual_procedure: |
+      Create 300 or more small dummy files in a scratch directory on an isolated
+      test host, then bulk-rename them to a different extension, for example
+      `Get-ChildItem *.txt | Rename-Item -NewName {$_.BaseName + '.locked'}`.
+      Confirm the events arrive as ActionType == "FileRenamed" with
+      PreviousFileName populated. This changes extensions without encrypting,
+      which is exactly the predicate the rule keys on.
+    notes: >-
+      Recorded as partial rather than trigger deliberately. The rule measures
+      rename volume across a device inside a window; no upstream atomic produces
+      that shape, and claiming otherwise would be a fabricated validation.
+
+  - rule: MDE_WinRM_RemoteExecution
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1021.006
+        atomic: 1
+        role: precondition
+        note: "Enable Windows Remote Management: the listener must exist on the target before any of the trigger tests can run."
+      - technique: T1021.006
+        atomic: 2
+        role: trigger
+        note: "Remote Code Execution with PS Credentials Using Invoke-Command: spawns wsmprovhost.exe children on the target."
+      - technique: T1021.006
+        atomic: 3
+        role: trigger
+        note: "WinRM Access with Evil-WinRM: the same host-side evidence from a non-Windows tool, which tests that the rule does not depend on the source-side client."
+    notes: >-
+      Telemetry appears on the target device. Onboard both the source and the
+      target to Defender for Endpoint, or the test will look silent.
+
+  - rule: MDE_PsExec_ServiceExecution
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1569.002
+        atomic: 1
+        role: trigger
+        note: "Execute a Command as a Service: creates and starts a service, the core primitive."
+      - technique: T1569.002
+        atomic: 2
+        role: trigger
+        note: "Use PsExec to execute a command on a remote host: installs and runs PSEXESVC.exe."
+      - technique: T1569.002
+        atomic: 3
+        role: trigger
+        note: "psexec.py (Impacket): the same service-based execution without any Sysinternals binary, which tests the rule's non-binary path."
+      - technique: T1021.002
+        atomic: 3
+        role: trigger
+        note: "Copy and Execute File with PsExec: exercises the administrative share path that precedes service creation."
+    notes: >-
+      Requires a second Windows host as the target with SMB reachable. Atomic 3
+      needs Python and Impacket on the test host.
+
+  # ----------------------------------------------------------- Azure cloud
+  - rule: Azure_NSG_OpenToInternet
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      `az network nsg rule create -g <rg> --nsg-name <nsg> -n test-open3389
+      --priority 1000 --source-address-prefixes '*' --destination-port-ranges 3389
+      --access Allow --protocol Tcp --direction Inbound`
+      then delete the rule afterwards. The subscription's activity log must be
+      connected to the workspace or no telemetry is produced.
+    notes: >-
+      T1190 and T1686.001 have no upstream atomics. If the NSG lives in a
+      subscription that is not covered by the Azure Activity connector, the test
+      proves nothing about the rule.
+
+  - rule: Azure_KeyVault_SecretAccessSpike
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      Give a test service principal read access to a vault, seed 30 or more secrets,
+      then loop `az keyvault secret show --id <uri>` across all of them inside one
+      hour. Diagnostic settings must be enabled on the vault with audit events
+      before this telemetry exists at all.
+    notes: >-
+      T1555.005 has no upstream atomics. The technique is a stand-in for
+      credential access from a vault rather than password-manager theft, and the
+      rule is validated with a vault-side procedure rather than an endpoint test.
+
+  - rule: Azure_KeyVault_AccessControlChange
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      `az keyvault set-policy --name <vault> --upn <test-account> --secret-permissions get list`
+      followed by `az keyvault update --name <vault> --default-action Allow`.
+      Revert both afterwards; the second command is the higher-severity variant and
+      is the one that opens the vault to the network.
+    notes: >-
+      T1098's Azure atomics add users or service principals to Azure RBAC roles,
+      which is a different control plane from a Key Vault access policy, and
+      T1686.001 has no upstream atomics. Neither is cited, because neither would
+      produce the vault diagnostic event this rule reads.
+
+  # ------------------------------------------------------------------ Hunts
+  - rule: HUN_FirstSeenASN_PerUser
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      Sign a test account in through a VPN provider whose autonomous system the
+      account has not used in the preceding 30 days, then confirm the ASN appears
+      as new for that user.
+    notes: >-
+      No upstream atomic produces Entra ID sign-in telemetry: T1078.004's atomics
+      create cloud service accounts and runbooks, which are control-plane events
+      and never appear in the interactive sign-in log this hunt reads.
+
+  - rule: HUN_SignInFromDatacenterASN
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      Sign a test account in from a VPS in one of the autonomous systems listed in
+      the hunt, for example OVH 16276, DigitalOcean 14061 or Hetzner 24940.
+    notes: >-
+      T1090.003's atomics exercise Tor and Psiphon on an endpoint, which produces
+      endpoint network telemetry rather than an Entra ID sign-in, so they do not
+      validate this hunt.
+
+  - rule: HUN_AnomalousMailboxForwarding
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      `Set-Mailbox -Identity <test-mailbox> -ForwardingSmtpAddress "smtp:external@example.org"`
+      against a test mailbox, then
+      `Set-Mailbox -Identity <test-mailbox> -ForwardingSmtpAddress $null` to revert.
+    notes: >-
+      The only upstream T1114.003 atomic creates an inbox rule with New-InboxRule
+      rather than a mailbox-level forwarding address, so it does not validate this
+      hunt. It is cited against M365_InboxRuleExfil, which is the rule it actually
+      exercises. This is the distinction between mail-forwarding and inbox-rule
+      persistence, and conflating the two is a common detection-mapping error.
+
+  - rule: HUN_GuestUserInvitedToPrivilegedGroup
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1136.003
+        atomic: 2
+        role: precondition
+        note: "Azure AD - Create a new user: creates the identity whose subsequent role assignment the hunt matches. It does not create a guest, so it is setup rather than a trigger."
+    manual_procedure: |
+      Invite an external test account, accept the invitation, then add the guest to
+      Application Administrator and confirm the audit event's target user principal
+      name contains #EXT#.
+    notes: >-
+      No upstream atomic creates an external guest identity. The hunt's guest
+      predicate must be validated with the manual procedure; the atomic above only
+      exercises the role-assignment half of the query.
+
+  - rule: HUN_NewScheduledTask
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1053.005
+        atomic: 2
+        role: trigger
+        note: "Scheduled task Local: creates the task with schtasks /create, matching the schtasks branch of the hunt."
+      - technique: T1053.005
+        atomic: 4
+        role: trigger
+        note: "Powershell Cmdlet Scheduled Task: Register-ScheduledTask, matching the second creation branch."
+    notes: >-
+      The hunt also requires a script interpreter or a living-off-the-land binary
+      in the task action. Confirm the atomic's action matches that filter before
+      concluding the hunt is broken.
+
+  - rule: HUN_OfficeChildProcess
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1566.001
+        atomic: 2
+        role: trigger
+        note: "Word spawned a command shell and used an IP address in the command line: the exact parent-child pair the hunt matches."
+      - technique: T1566.001
+        atomic: 1
+        role: precondition
+        note: "Download Macro-Enabled Phishing Attachment: delivers the document used by the trigger test. On its own it produces no child process."
+    notes: >-
+      Requires Microsoft Office on the test host. The delivery atomic alone will
+      not fire the hunt; only the execution step produces the event.
+
+  - rule: HUN_RareProcessPerDevice
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      Copy a benign, uniquely named executable (a freshly compiled hello-world, or
+      any signed tool with a hash you have never run in the estate) to a single test
+      device and run it once, then confirm it appears with a device count of one.
+    notes: >-
+      The hunt measures estate-relative hash rarity. That is a property of an
+      environment, not of a binary, so no fixed atomic can reproduce it. Citing an
+      obfuscation atomic here would imply a test that cannot fire the query.
+
+  - rule: HUN_UnsignedBinaryFromTemp
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      Build or download an unsigned portable executable, drop it in the user's
+      temporary folder and run it. Confirm AdditionalFields.IsSigned is populated
+      on the device before treating a null result as a detection failure.
+    notes: >-
+      T1204.002's closest atomics drop a .lnk (test 10) or a .bat (test 13) rather
+      than an unsigned executable, so neither satisfies the hunt's extension filter
+      and neither is cited.
+
+  - rule: HUN_DNSRequestsToFreeDynamicDomains
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks: []
+    manual_procedure: |
+      From a test device, resolve a hostname under one of the listed dynamic-DNS
+      providers, for example `Resolve-DnsName testhost.duckdns.org`. DNS-aware
+      network inspection must be in place for the query to be visible in device
+      network telemetry.
+    notes: >-
+      T1071.004's atomics exercise DNS query volume, beaconing, and long-domain
+      patterns against attacker-controlled domains; none resolves a free
+      dynamic-DNS provider hostname, which is what this hunt filters on. T1568.002
+      is a Python DGA simulation with no registered-domain component.
+
+  - rule: HUN_NewSSHConnectionFromInternal
+    status: STATIC VALIDATION
+    evidence: "CI: schema, KQL lint, ATT&CK coherence pass (scripts/ci_validate.py)"
+    checks:
+      - technique: T1021.001
+        atomic: 1
+        role: partial
+        note: "RDP to Remote Host: produces RDP network telemetry from a workstation, covering the 3389 branch. A single execution will not clear the hunt's fan-out floor; run it against three distinct internal targets inside the window."
+    manual_procedure: |
+      For the SSH branch: from a test workstation, connect with `ssh <user>@<lab-host>`
+      to three distinct internal hosts inside one hour and confirm the connections
+      are classified as private, non-public addresses.
+    notes: >-
+      T1021.004's two atomics enable SSH on ESXi hosts; they do not create a client
+      SSH connection, so they cannot validate this hunt and are not cited. The
+      fan-out requirement (three or more distinct internal targets) is a property
+      of the hunt, not of any single atomic.

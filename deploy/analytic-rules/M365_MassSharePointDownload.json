@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-m365masssharepointdownload-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a06",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'M365 - Mass SharePoint / OneDrive Download'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-m365masssharepointdownload-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "M365 - Mass SharePoint / OneDrive Download",
+        "description": "Detects users downloading > 200 files within 1 hour from SharePoint or OneDrive,\nwith comparison to the user's own 14-day baseline (mean + 3*stdev). Catches\ninsider data theft and post-compromise smash-and-grab exfiltration.\n",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "let abs_threshold = 200;\nlet excluded_users = dynamic([]);\nlet baseline =\n  OfficeActivity\n  | where TimeGenerated between (ago(14d) .. ago(1h))\n  | where Operation in (\"FileDownloaded\",\"FileSyncDownloadedFull\")\n  | summarize HourlyCount = count() by UserId, bin(TimeGenerated, 1h)\n  | summarize MeanHourly = avg(HourlyCount), StdevHourly = stdev(HourlyCount) by UserId;\nOfficeActivity\n| where TimeGenerated > ago(1h)\n| where Operation in (\"FileDownloaded\",\"FileSyncDownloadedFull\")\n| where UserId !in (excluded_users)\n| summarize Downloads = count(), LastDownload = max(TimeGenerated),\n            Files = make_set(OfficeObjectId, 50), IPs = make_set(ClientIP, 10)\n          by UserId\n| where Downloads >= abs_threshold\n| join kind=leftouter baseline on UserId\n| extend AnomalyScore = iff(StdevHourly > 0, (todouble(Downloads) - MeanHourly) / StdevHourly, 99.0)\n| where AnomalyScore > 3.0 or isnull(MeanHourly)\n| project TimeGenerated = LastDownload, UserId, Downloads, MeanHourly,\n          StdevHourly, AnomalyScore, IPs, Files\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "P14D",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "Collection",
+          "Exfiltration"
+        ],
+        "techniques": [
+          "T1213.002",
+          "T1567.002"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "UserId"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT12H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Account"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Mass SharePoint download by {{UserId}}",
+          "alertDescriptionFormat": "{{UserId}} downloaded {{Downloads}} files in one hour, above its own 14-day baseline, from {{IPs}}."
+        }
+      }
+    }
+  ]
+}

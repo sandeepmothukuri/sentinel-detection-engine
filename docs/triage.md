@@ -1,5 +1,12 @@
 # Triage
 
+![L3 triage dashboard design preview](images/workbooks/01-triage-dashboard-design-preview.png)
+
+*Design preview generated from `Workbooks/L3-Triage-Dashboard.json` by
+`scripts/render_design_preview.py`. It requires deployment to display live telemetry and contains
+no data: every panel shows `—` where a value would appear.*
+
+
 The L1 → L3 workflow documents live in [`docs/workflows/`](workflows/). This page connects them to the specific artifacts in this repository.
 
 ## Triage flow

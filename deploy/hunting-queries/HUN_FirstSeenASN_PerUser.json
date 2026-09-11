@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "hunt-hunfirstseenasnperuser-name": {
+      "type": "string",
+      "defaultValue": "hunfirstseenasnperuser",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the hunting query 'HUN - First-Seen ASN per User (30-day baseline)'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', parameters('hunt-hunfirstseenasnperuser-name'))]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "HUN - First-Seen ASN per User (30-day baseline)",
+        "category": "Hunting Queries",
+        "query": "let lookback = 30d;\nlet recent = 24h;\nlet baseline =\n  SigninLogs\n  | where TimeGenerated between (ago(lookback) .. ago(recent))\n  | where ResultType == 0\n  | summarize KnownASNs = make_set(AutonomousSystemNumber, 50) by UserPrincipalName;\nSigninLogs\n| where TimeGenerated > ago(recent)\n| where ResultType == 0\n| extend ASN = AutonomousSystemNumber\n| join kind=leftouter baseline on UserPrincipalName\n// ASN is a string: isnotempty is the correct emptiness test for strings.\n| where isnotempty(ASN) and not(set_has_element(KnownASNs, ASN))\n| project TimeGenerated, UserPrincipalName, IPAddress, ASN, Location,\n          AppDisplayName, UserAgent\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Hypothesis - Account takeover often shows up as a sign-in from an ASN the user has never used before. Surface every successful interactive sign-in in the last 24 h whose ASN does not appear in the prior 30 d for that user."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078.004"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,5 +1,11 @@
 # Data Sources
 
+![Connector, table and rule coverage](images/sentinel/01-connector-table-coverage.png)
+
+*Source: `docs/diagrams/sentinel/01-connector-table-coverage.mmd`. The per-table rule counts are
+derived from `requiredDataConnectors` in the 28 rule files.*
+
+
 Every rule's telemetry dependency is declared in `requiredDataConnectors` (machine-checked by CI) and summarised in `metadata.telemetryDependency`. This page documents what to enable and the assumptions baked into the queries.
 
 ## Connectors
@@ -18,7 +24,7 @@ Portal path: Sentinel → Data connectors → search the connector name → Open
 
 ## Cost notes
 
-- The two baseline rules (`M365_MassSharePointDownload`, `Azure_KeyVault_SecretAccessSpike`) run a 30-day `queryPeriod` hourly — the most expensive queries in the pack. Reduced lookbacks are documented in each rule's tuning guidance.
+- The two baseline rules (`M365_MassSharePointDownload`, `Azure_KeyVault_SecretAccessSpike`) run the longest `queryPeriod` the platform allows — 14 days, hourly — because they compute a per-identity mean and standard deviation over that history. They are the most expensive queries in the pack, and both rules fall back to a static threshold until the workspace holds enough history. Reduced lookbacks are documented in each rule's tuning guidance.
 - MDE advanced hunting volume scales with device count; the hunts scan 24h–14d windows and are intended for interactive use, not scheduled.
 - `SigninLogs` are already high-volume; the Entra ID rules filter on `ResultType`/client lists early to keep scanned data bounded.
 

@@ -1,0 +1,97 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-mdeshadowcopydeletion-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a0d",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'MDE - Shadow Copy / Recovery Inhibited'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-mdeshadowcopydeletion-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "MDE - Shadow Copy / Recovery Inhibited",
+        "description": "Detects command lines that delete volume shadow copies, delete the backup\ncatalog, or disable Windows recovery. This is the pre-encryption step of\nvirtually every ransomware affiliate playbook (Conti/LockBit/Black Basta/\nAkira lineage): destroy the recovery path first so the victim cannot restore\nwithout paying. Taken alone it is extremely high-signal — legitimate\nadministrators do not typically run `vssadmin delete shadows /all` on\nworkstations.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "// Interpreters and utilities that legitimately own shadow-copy management.\nlet recovery_tools = dynamic([\n  \"vssadmin.exe\", \"wmic.exe\", \"wbadmin.exe\", \"bcdedit.exe\",\n  \"powershell.exe\", \"pwsh.exe\", \"diskshadow.exe\", \"cmd.exe\"\n]);\n// Term pairs are evaluated with has_any, which matches whole terms; keep each\n// entry as a phrase an attacker would actually type.\nlet destruction_terms = dynamic([\n  \"delete shadows\",\n  \"shadowcopy delete\",\n  \"delete catalog\",\n  \"delete systemstatebackup\",\n  \"recoveryenabled no\",\n  \"bootstatuspolicy ignoreallfailures\",\n  \"win32_shadowcopy\",\n  \"resize shadowstorage\",\n  \"delete shadows /all /quiet\"\n]);\nDeviceProcessEvents\n| where TimeGenerated > ago(1h)\n| where FileName in~ (recovery_tools)\n| where ProcessCommandLine has_any (destruction_terms)\n| project TimeGenerated, DeviceId, DeviceName, AccountName, FileName,\n          ProcessCommandLine, FolderPath, SHA256,\n          InitiatingProcessFileName, InitiatingProcessCommandLine\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "Impact"
+        ],
+        "techniques": [
+          "T1490"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "DeviceName"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "AccountName"
+              }
+            ]
+          },
+          {
+            "entityType": "Process",
+            "fieldMappings": [
+              {
+                "identifier": "CommandLine",
+                "columnName": "ProcessCommandLine"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT12H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Host"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Shadow copy or recovery deletion on {{DeviceName}}",
+          "alertDescriptionFormat": "{{FileName}} on {{DeviceName}} was invoked with a command line that deletes shadow copies, the backup catalog, or Windows recovery: {{ProcessCommandLine}}"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a11
+name: Entra ID - Privileged Role Granted to User or Service Principal
+description: |
+  Detects membership being added to a privileged Entra ID directory role. An
+  attacker who has already obtained directory-write permissions uses this to
+  establish durable, legitimate-looking access: the new role assignment survives
+  session revocation, password resets, and MFA re-registration. The July 2024
+  Midnight Blizzard campaign against Microsoft used exactly this step
+  (T1098.003). Legitimate grants are usually driven by PIM with an approval
+  record, which is the primary triage discriminator.
+severity: Medium
+status: Available
+kind: Scheduled
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - PrivilegeEscalation
+relevantTechniques:
+  - T1098.003
+query: |
+  // Roles with tenant-wide or security-control impact. Keep this list focused:
+  // adding reader-type roles here is what turns the rule into noise.
+  let privileged_roles = dynamic([
+    "Global Administrator",
+    "Privileged Role Administrator",
+    "Privileged Authentication Administrator",
+    "Application Administrator",
+    "Cloud Application Administrator",
+    "Authentication Administrator",
+    "Conditional Access Administrator",
+    "Exchange Administrator",
+    "SharePoint Administrator",
+    "Security Administrator",
+    "User Administrator",
+    "Helpdesk Administrator",
+    "Intune Administrator",
+    "Domain Services Administrator"
+  ]);
+  let excluded_actors = dynamic([]);
+  // Both spellings are emitted by different service versions, and the PIM
+  // variants only appear when the tenant uses Privileged Identity Management.
+  let role_grant_operations = dynamic([
+    "Add member to role",
+    "Add member to role (permanent)",
+    "Add eligible member to role",
+    "Add eligible member to role in PIM completed (permanent)",
+    "Add member to role in PIM completed (permanent)",
+    "Add member to role in PIM requested (permanent)"
+  ]);
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName in (role_grant_operations)
+  | extend Actor = tostring(InitiatedBy.user.userPrincipalName)
+  | extend ActorApp = tostring(InitiatedBy.app.displayName)
+  | extend TargetUpn = tostring(TargetResources[0].userPrincipalName)
+  | extend TargetType = tostring(TargetResources[0].type)
+  | mv-expand mp = TargetResources[0].modifiedProperties
+  | extend PropName = tostring(mp.displayName), PropValue = tostring(mp.newValue)
+  | where PropName == "Role.DisplayName"
+  // The role name arrives JSON-quoted inside the modifiedProperties value.
+  | extend RoleName = replace_string(PropValue, "\"", "")
+  | extend RoleName = trim(@"[ ]", RoleName)
+  | where RoleName in (privileged_roles)
+  | where Actor !in (excluded_actors) and ActorApp !in (excluded_actors)
+  | project TimeGenerated, OperationName, Actor, ActorApp, RoleName,
+            TargetUpn, TargetType, Result, AdditionalDetails
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: TargetUpn
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT6H
+    matchingMethod: Selected
+    groupByEntities:
+      - Account
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: >-
+    Privileged role granted - {{RoleName}} to {{TargetUpn}}
+  alertDescriptionFormat: >-
+    {{Actor}} ({{ActorApp}}) added {{TargetUpn}} to {{RoleName}}. Verify against a
+    PIM approval record or change ticket before clearing.
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: AuditLogs (Entra ID connector). PIM-backed grants are only visible when the tenant uses Privileged Identity Management; without PIM, permanent role assignments still generate "Add member to role". Directory role names are read from the modifiedProperties payload, not from a lookup, so newly created custom privileged roles are not covered until added to privileged_roles.
+  falsePositives: |
+    - Identity-governance and access-review platforms enrolling users in
+      privileged roles (appears as ActorApp, not a human).
+    - Onboarding runbooks that make a helpdesk user an Exchange or SharePoint
+      administrator for a documented change.
+    - Break-glass account provisioning performed out-of-hours by design — these
+      should be listable and reviewed, not silently excluded.
+  tuningGuidance: |
+    - Trim privileged_roles to the roles that actually page in your environment.
+      Global Administrator, Privileged Role Administrator, and the Application
+      Administrator pair are the ones worth an incident; reader roles are not.
+    - If your tenant runs PIM exclusively, an unexpected *permanent* assignment is
+      the anomaly — filter to the permanent operation names and treat the eligible
+      operations as informational.
+    - Consider raising severity to High in tenants where privileged grants are
+      rare, and documenting that decision in the tuning log rather than here.
+  suppression: |
+    No static suppression. Break-glass provisioning is handled by a time-boxed
+    change-window exclusion recorded in the tuning log.
+  expectedVolume: Low. Expect zero to a handful per week in a tenant with a controlled privileged-access process.
+version: 1.0.0

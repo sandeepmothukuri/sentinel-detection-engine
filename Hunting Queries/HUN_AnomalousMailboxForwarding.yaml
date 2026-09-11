@@ -26,15 +26,27 @@ query: |
   OfficeActivity
   | where TimeGenerated > ago(14d)
   | where Operation in ("Set-Mailbox","Set-ForwardingAddress")
-  | extend Params = tostring(Parameters)
-  | extend ForwardSmtp = extract(@"ForwardingSmtpAddress[\s\S]*?'(?:smtp:)?([^']+)'", 1, Params)
-  | extend ForwardAddr = extract(@"ForwardingAddress[\s\S]*?'([^']+)'", 1, Params)
-  | extend Target = coalesce(ForwardSmtp, ForwardAddr)
+  // Parameters is a dynamic array of {"Name","Value"} objects (capitalised keys).
+  // Expand it and read the parameters by name instead of regex-scanning a string
+  // rendering of the array — the regex form breaks silently if Microsoft changes
+  // the serialisation or parameter ordering.
+  | mv-expand p = Parameters
+  | extend PName = tostring(p.Name), PValue = tostring(p.Value)
+  | where PName in ("ForwardingSmtpAddress", "ForwardingAddress", "DeliverToMailboxAndForward")
+  | summarize Params = make_bag(bag_pack(PName, PValue)) by TimeGenerated, UserId, ClientIP, Operation, OfficeObjectId
+  | extend ForwardSmtp = tostring(Params.ForwardingSmtpAddress)
+  | extend ForwardAddr = tostring(Params.ForwardingAddress)
+  // ForwardingSmtpAddress values can arrive as "smtp:user@domain.com" and
+  // ForwardingAddress as a proxy address ("SMTP:user@domain.com") or a DN, so
+  // strip the protocol prefix and stray quote characters before parsing.
+  | extend RawTarget = tostring(coalesce(ForwardSmtp, ForwardAddr))
+  | extend Target = replace_regex(RawTarget, @"(?i)^\s*smtp:", "")
+  | extend Target = trim(@" \t", replace_string(Target, "\"", ""))
   | where isnotempty(Target)
-  | extend TargetDomain = tolower(tostring(split(Target,"@")[1]))
-  | extend UserDomain = tolower(tostring(split(UserId,"@")[1]))
-  | where TargetDomain != UserDomain and isnotempty(TargetDomain)
-  | project TimeGenerated, UserId, Target, TargetDomain, ClientIP, Operation
+  | extend TargetDomain = tolower(tostring(split(Target, "@")[1]))
+  | extend UserDomain = tolower(tostring(split(UserId, "@")[1]))
+  | where isnotempty(TargetDomain) and TargetDomain != UserDomain
+  | project TimeGenerated, UserId, Target, TargetDomain, ClientIP, Operation, Params
 expectedFindings: |
   - Legitimate forwards to counsel, auditors, or personal addresses (known HR cases).
   - Zero rows is the healthy state for most tenants that block external forwarding.
@@ -42,6 +54,7 @@ expectedFindings: |
     to the mailbox owner.
 investigationSteps: |
   1. Call/verify the mailbox owner out-of-band — was the forward intentional?
+     Do not remove the forward before making contact; it is the evidence.
   2. Review the mailbox audit log (MailItemsAccessed, InboxRule, New-InboxRule)
      for the same window for signs of compromise.
   3. Check MFA registration and recent sign-ins for the account.
@@ -51,8 +64,15 @@ escalation: |
   Escalate to L3/IR immediately if the mailbox is executive, finance, or HR, or
   if the forward was set from an unusual IP / without user knowledge.
 limitations: |
-  The Parameters extraction relies on the Exchange admin audit serialisation;
-  if Microsoft changes the parameter format the extract returns empty and the
-  hunt goes quiet silently — re-verify monthly. Multi-tenant environments with
-  legitimate cross-domain forwarding will need a domain allow-list.
+  The hunt reads Parameters by parameter *name* after mv-expand, so it no longer
+  depends on the key order or on the string rendering of the array. It does still
+  depend on the parameter being present: some Set-Mailbox operations write only
+  the mailbox-level forwarding properties, and mail flow rules (transport rules)
+  that redirect mail are a different operation and are not covered here.
+  Multi-tenant environments with legitimate cross-domain forwarding need a
+  domain allow-list.
 version: 1.1.0
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.yaml

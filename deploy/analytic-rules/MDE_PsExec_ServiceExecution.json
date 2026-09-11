@@ -1,0 +1,99 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-mdepsexecserviceexecution-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a10",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'MDE - PsExec-Style Service Execution'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-mdepsexecserviceexecution-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "MDE - PsExec-Style Service Execution",
+        "description": "Detects the two structural markers of PsExec-style lateral movement: the\nPsExec service binary (PSEXESVC.exe) executing, or the service control manager\nspawning a child whose command line references an administrative share\n(ADMIN$ / IPC$). Reusing a Windows service to run a remote payload is the\noldest lateral-movement primitive on Windows (T1569.002) and is used by\ncommodity ransomware affiliates and red teams alike.\n",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "// PsExec unzips PSEXESVC.exe onto the target and starts it as a service. The\n// binary name is near-unique to the tool, and legitimate software does not\n// name its service binary PSEXESVC unless it *is* PsExec.\nlet psexec_service = dynamic([\"psexesvc.exe\"]);\n// Children the service control manager spawns when a service image or command\n// line points at an administrative share (the PsExec -c / -s pattern, and the\n// same primitive used by SMB-based relay tooling).\nlet shell_binaries = dynamic([\n  \"cmd.exe\", \"powershell.exe\", \"pwsh.exe\", \"net.exe\", \"net1.exe\",\n  \"whoami.exe\", \"sc.exe\", \"wmic.exe\"\n]);\nlet admin_share_marker = \"ADMIN$\";\nDeviceProcessEvents\n| where TimeGenerated > ago(1h)\n| where InitiatingProcessFileName in~ (psexec_service)\n      or (InitiatingProcessFileName =~ \"services.exe\"\n          and ProcessCommandLine contains admin_share_marker)\n| where InitiatingProcessFileName in~ (psexec_service)\n      or FileName in~ (shell_binaries)\n| project TimeGenerated, DeviceId, DeviceName, AccountName, FileName,\n          ProcessCommandLine, FolderPath, SHA256,\n          InitiatingProcessFileName, InitiatingProcessCommandLine,\n          InitiatingProcessAccountName\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "LateralMovement",
+          "Execution"
+        ],
+        "techniques": [
+          "T1569.002",
+          "T1021.002"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "DeviceName"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "AccountName"
+              }
+            ]
+          },
+          {
+            "entityType": "Process",
+            "fieldMappings": [
+              {
+                "identifier": "CommandLine",
+                "columnName": "ProcessCommandLine"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT12H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Host"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "PsExec-style service execution on {{DeviceName}}",
+          "alertDescriptionFormat": "{{InitiatingProcessFileName}} launched {{FileName}} on {{DeviceName}} with a command line referencing an administrative share: {{ProcessCommandLine}}"
+        }
+      }
+    }
+  ]
+}

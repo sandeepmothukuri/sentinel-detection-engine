@@ -1,5 +1,10 @@
 # Metrics — Detection Quality Framework
 
+> **Every value on this page is `Not yet measured`.** Metrics require a deployed rule and closed
+> incidents; there is no live deployment behind this repository. The measurement table, the queries
+> that fill it and the tuning gate live in
+> [`../tests/validation/performance-metrics.md`](../tests/validation/performance-metrics.md).
+
 No metric in this file is invented. Values are recorded only when they can be backed by workspace queries or executed tests, and every rule starts at the same honest baseline: **static validation only, no live measurements.**
 
 ## Statuses
@@ -21,13 +26,13 @@ Precision, recall, FP rate, and alert volume are **blank until a live or simulat
 | EntraID_LegacyAuthSuccess | SigninLogs | High | ~0 post-CA-block | — | — | — | manual-only | untuned |
 | EntraID_ServicePrincipalCredAdd | AuditLogs | High | Low | — | — | — | manual-only | untuned |
 | M365_InboxRuleExfil | OfficeActivity | High | Very low | — | — | — | T1114.003-1 mapped | untuned |
-| M365_MassSharePointDownload | OfficeActivity (30d baseline) | Medium | Low post-exclusions | — | — | — | manual-only | untuned |
+| M365_MassSharePointDownload | OfficeActivity (14d baseline) | Medium | Low post-exclusions | — | — | — | manual-only | untuned |
 | M365_OAuthConsentSuspiciousApp | AuditLogs | High | Low | — | — | — | T1528-1 mapped | untuned |
 | MDE_LOLBin_Rundll32_Network | DeviceProcess+Network | High | Low | — | — | — | T1218.011-1/-23 mapped | untuned |
 | MDE_MSHTA_RemoteScript | DeviceProcessEvents | High | Very low | — | — | — | T1218.005-1/-2 mapped | untuned |
 | MDE_PowerShell_EncodedCommand | DeviceProcessEvents | High | Low, bursts on rollouts | — | — | — | T1059.001-1/-3 mapped | untuned |
 | Azure_NSG_OpenToInternet | AzureActivity | High | Low | — | — | — | manual-only | untuned |
-| Azure_KeyVault_SecretAccessSpike | AzureDiagnostics (30d baseline) | High | Very low | — | — | — | manual-only | untuned |
+| Azure_KeyVault_SecretAccessSpike | AzureDiagnostics (14d baseline) | High | Very low | — | — | — | manual-only | untuned |
 
 ## Formulas (computed by the workbook once incidents exist)
 

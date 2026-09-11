@@ -1,0 +1,111 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a12
+name: Azure - Key Vault Access Policy or Network ACL Modified
+description: |
+  Detects a write to a Key Vault's access policy, firewall rules, or top-level
+  vault configuration. This is the second half of the Key Vault attack path:
+  first weaken the vault's access controls — grant a policy that allows secrets
+  to be read, or open the firewall so the attacker's address is permitted — and
+  then harvest credentials. Pairs with the "Key Vault Secret Access Spike" rule,
+  which detects the harvesting step. Alerting on the control change catches the
+  intrusion before the secrets leave.
+severity: High
+status: Available
+kind: Scheduled
+requiredDataConnectors:
+  - connectorId: AzureActivity
+    dataTypes:
+      - AzureActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - PrivilegeEscalation
+  - DefenseEvasion
+relevantTechniques:
+  - T1098
+  - T1686.001
+query: |
+  let sensitive_operations = dynamic([
+    "MICROSOFT.KEYVAULT/VAULTS/WRITE",
+    "MICROSOFT.KEYVAULT/VAULTS/ACCESSPOLICIES/WRITE",
+    "MICROSOFT.KEYVAULT/VAULTS/FIREWALLRULES/WRITE",
+    "MICROSOFT.KEYVAULT/VAULTS/PRIVATEENDPOINTCONNECTIONS/WRITE",
+    "MICROSOFT.KEYVAULT/VAULTS/PRIVATEENDPOINTCONNECTIONS/APPROVEPRIVATEENDPOINTCONNECTION/ACTION"
+  ]);
+  let excluded_callers = dynamic([]);
+  AzureActivity
+  | where TimeGenerated > ago(1h)
+  | where OperationNameValue in (sensitive_operations)
+  | where ActivityStatusValue in ("Success", "Succeeded")
+  | where Caller !in (excluded_callers)
+  // The request body carries the new ACL/policy state. It is occasionally
+  // truncated on very large payloads, so the extracted values are triage aids —
+  // treat a null as "open the Azure Activity record", not as "no change".
+  | extend props = parse_json(tostring(Properties))
+  | extend reqBody = parse_json(tostring(props.requestbody))
+  | extend vaultProps = parse_json(tostring(reqBody.properties))
+  | extend DefaultNetworkAction = tostring(vaultProps.networkAcls.defaultAction)
+  | extend FirewallBypass = tostring(vaultProps.networkAcls.bypass)
+  | extend AccessPolicyCount = array_length(vaultProps.accessPolicies)
+  | project TimeGenerated, Caller, CallerIpAddress, ResourceId, ResourceGroup,
+            OperationNameValue, ActivityStatusValue,
+            DefaultNetworkAction, FirewallBypass, AccessPolicyCount, props
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Caller
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: CallerIpAddress
+  - entityType: AzureResource
+    fieldMappings:
+      - identifier: ResourceId
+        columnName: ResourceId
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT6H
+    matchingMethod: Selected
+    groupByEntities:
+      - AzureResource
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: Key Vault access control modified - {{ResourceId}}
+  alertDescriptionFormat: >-
+    {{Caller}} performed {{OperationNameValue}} on {{ResourceId}} from
+    {{CallerIpAddress}}. Verify the new access policy or network ACL is an
+    approved change before treating it as routine.
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: AzureActivity (Azure Activity log connector at subscription scope). Properties.requestbody carries the submitted vault definition; it is occasionally truncated for very large bodies, and vaults managed through a control plane other than ARM may report a different operation name — confirm the operation strings against a sample deployment before relying on the rule.
+  falsePositives: |
+    - Infrastructure-as-code pipelines adding the vault's own managed identity to
+      an access policy, or adding a new application's service principal.
+    - Private-endpoint onboarding for a new network segment, including the
+      approval action on the pending connection.
+    - Vault platform upgrades that touch the top-level vault resource.
+  tuningGuidance: |
+    - The exclusion list should hold the *deployment service principals* that
+      legitimately patch vault configuration, each with an owner and a change
+      record — not individual human administrators, whose writes you want to see.
+    - If IaC churn makes the VAULTS/WRITE operation routinely noisy, drop that
+      entry and keep the ACCESSPOLICIES / FIREWALLRULES operations, which are the
+      ones with direct security impact.
+    - A network ACL change back to "Allow" default action on a vault that was
+      previously restricted is the highest-priority variant: treat it as
+      escalation-worthy even when the caller is familiar.
+  suppression: |
+    No static suppression. Deployment-identity allow-listing is the supported
+    tuning path; keep the list small and reviewed, because every entry is a
+    standing exemption from a control you are relying on.
+  expectedVolume: Low. Higher during platform onboarding projects, which is exactly when the tuning log should record a spike.
+version: 1.0.0

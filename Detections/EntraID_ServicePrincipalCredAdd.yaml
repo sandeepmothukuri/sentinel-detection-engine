@@ -9,6 +9,7 @@ description: |
   password resets.
 severity: High
 status: Available
+kind: Scheduled
 requiredDataConnectors:
   - connectorId: AzureActiveDirectory
     dataTypes:
@@ -60,6 +61,11 @@ incidentConfiguration:
       - Account
 eventGroupingSettings:
   aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: Credential added to {{TargetApp}} by {{Actor}}
+  alertDescriptionFormat: >-
+    {{Actor}} performed {{OperationName}} against {{TargetApp}}. Confirm the actor
+    is human or expected automation before revoking the new credential.
 metadata:
   author: Sandeep Mothukuri
   validationStatus: static-validation

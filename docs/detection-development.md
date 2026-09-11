@@ -1,5 +1,11 @@
 # Detection Development
 
+![Analytics rule anatomy and the gate that checks each section](images/detections/02-analytics-rule-anatomy.png)
+
+*Source: `docs/diagrams/detections/02-analytics-rule-anatomy.mmd`. Each gate name corresponds to a
+check family implemented in `scripts/ci_validate.py`.*
+
+
 ## Rule anatomy
 
 Every detection in `Detections/` follows one schema. Example skeleton:
@@ -50,9 +56,9 @@ version: 1.1.0
 
 ## Query style rules
 
-1. **Filter early** — put `where TimeGenerated > ago(...)` and the most selective filters first; a scheduled rule runs hourly, and cost compounds across 22 rules.
+1. **Filter early** — put `where TimeGenerated > ago(...)` and the most selective filters first; a scheduled rule runs hourly, and cost compounds across 18 rules.
 2. **Bound time explicitly** — every `let` sub-query re-derives its own window from `ago()`; never rely on implicit workspace defaults.
-3. **Use baselines deliberately** — the two anomaly rules (`MassSharePointDownload`, `KeyVaultSpike`) pay a 30-day `queryPeriod` for their baselines; this is a documented cost/precision trade-off in [metrics.md](metrics.md).
+3. **Use baselines deliberately** — the two anomaly rules (`MassSharePointDownload`, `KeyVaultSpike`) pay a 14-day `queryPeriod` (the platform maximum) for their baselines; this is a documented cost/precision trade-off in [metrics.md](metrics.md).
 4. **Entity-mapped columns must be projected** strings, not arrays (`make_set` output cannot be entity-mapped).
 5. **Case sensitivity** — prefer `=~` / `in~` for names, `has_any` for term lists, and be explicit with `_cs` operators when casing matters.
 6. **Allow-lists live in the query** — `let excluded_* = dynamic([]);` placeholders, filled during tuning, kept under change control. No magic numbers buried mid-query; thresholds are named `let` values.

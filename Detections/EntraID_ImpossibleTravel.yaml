@@ -7,6 +7,7 @@ description: |
   session token theft, AiTM phishing, or shared credentials.
 severity: High
 status: Available
+kind: Scheduled
 requiredDataConnectors:
   - connectorId: AzureActiveDirectory
     dataTypes:
@@ -31,7 +32,10 @@ query: |
   | extend City = tostring(LocationDetails.city), Country = tostring(LocationDetails.countryOrRegion)
   | extend Lat = todouble(LocationDetails.geoCoordinates.latitude)
   | extend Lon = todouble(LocationDetails.geoCoordinates.longitude)
-  | where isnotempty(Lat) and isnotempty(Lon)
+  // isnotempty() does not apply to numeric types — a todouble() that fails to
+  // parse is null, not empty. Using isnotempty() here filtered out every row and
+  // made the rule permanently silent.
+  | where isnotnull(Lat) and isnotnull(Lon)
   | sort by UserPrincipalName asc, TimeGenerated asc
   | extend PrevTime = prev(TimeGenerated), PrevUser = prev(UserPrincipalName)
   | extend PrevLat = prev(Lat), PrevLon = prev(Lon), PrevCity = prev(City), PrevCountry = prev(Country)
@@ -61,6 +65,12 @@ incidentConfiguration:
     matchingMethod: AllEntities
 eventGroupingSettings:
   aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: Impossible travel for {{UserPrincipalName}}
+  alertDescriptionFormat: >-
+    {{UserPrincipalName}} signed in from {{City}}/{{Country}} after signing in
+    from {{PrevCity}}/{{PrevCountry}}. Confirm with the user before revoking
+    sessions — VPN egress is the usual benign explanation.
 metadata:
   author: Sandeep Mothukuri
   validationStatus: static-validation

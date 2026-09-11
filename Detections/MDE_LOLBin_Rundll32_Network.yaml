@@ -6,6 +6,7 @@ description: |
   this pattern is a hallmark of CobaltStrike, IcedID, and Qakbot loaders.
 severity: High
 status: Available
+kind: Scheduled
 requiredDataConnectors:
   - connectorId: MicrosoftThreatProtection
     dataTypes:
@@ -23,6 +24,10 @@ relevantTechniques:
   - T1218.011
   - T1071.001
 query: |
+  // Loader families that abuse rundll32 for C2 overwhelmingly use these ports.
+  // Restricting to them keeps volume manageable; widen deliberately and watch the
+  // alert count (see tuningGuidance).
+  let suspicious_ports = dynamic([80, 443, 8080, 8443, 53]);
   let proc =
     DeviceProcessEvents
     | where TimeGenerated > ago(1h)
@@ -35,12 +40,15 @@ query: |
     | where InitiatingProcessFileName =~ "rundll32.exe"
     | where RemoteIPType !in ("Private","Loopback","LinkLocal","Reserved")
     | where isnotempty(RemoteIP)
+    // RemotePort is dynamic in DeviceNetworkEvents; cast before the set membership
+    // test so the filter behaves predictably across connector schemas.
+    | where toint(RemotePort) in (suspicious_ports)
     | project NetTime = TimeGenerated, DeviceId, InitiatingProcessId,
               RemoteIP, RemotePort, RemoteUrl;
   proc
   | join kind=inner net on DeviceId, $left.ProcessId == $right.InitiatingProcessId
   | where NetTime between (ProcTime .. (ProcTime + 10m))
-  | project ProcTime, NetTime, DeviceId, DeviceName, AccountName, ProcessCommandLine,
+  | project TimeGenerated = NetTime, ProcTime, DeviceId, DeviceName, AccountName, ProcessCommandLine,
             RemoteIP, RemotePort, RemoteUrl, InitiatingProcessFileName
 entityMappings:
   - entityType: Host
@@ -70,6 +78,11 @@ incidentConfiguration:
       - Host
 eventGroupingSettings:
   aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: rundll32 network call from {{DeviceName}}
+  alertDescriptionFormat: >-
+    rundll32.exe on {{DeviceName}} connected to {{RemoteIP}} after launching with
+    the command line recorded in this alert.
 metadata:
   author: Sandeep Mothukuri
   validationStatus: static-validation

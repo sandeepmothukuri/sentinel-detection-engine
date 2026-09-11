@@ -1,0 +1,7 @@
+flowchart LR
+  C1["Microsoft Entra ID connector"] --> T1["SigninLogs · 5 rules"] & T2["AuditLogs · 4 rules"]
+  C2["Office 365 connector"] --> T3["OfficeActivity · 3 rules"]
+  C3["Microsoft Defender XDR connector"] --> T4["DeviceProcessEvents · 10 rules"] & T5["DeviceFileEvents · 1 rule"] & T6["DeviceNetworkEvents · 3 rules"] & T7["DeviceInfo · 1 rule"]
+  C4["Azure Activity connector"] --> T8["AzureActivity · 2 rules"]
+  C5["Key Vault diagnostic settings"] --> T9["AzureDiagnostics · 1 rule"]
+  NOTE["Counts come from requiredDataConnectors in the 28 rule files.<br/>tests/test_diagrams.py fails if this diagram disagrees with them."] --- T1

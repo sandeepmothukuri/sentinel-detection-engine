@@ -1,0 +1,1430 @@
+{
+ "source": "github.com/redcanaryco/atomic-red-team",
+ "source_path": "https://raw.githubusercontent.com/redcanaryco/atomic-red-team/master/atomics/{tid}/{tid}.yaml",
+ "techniques": {
+  "T1021.001": [
+   {
+    "index": 1,
+    "name": "RDP to Remote Host",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Changing RDP Port to Non Standard Port via Powershell",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Changing RDP Port to Non Standard Port via Command_Prompt",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Disable NLA for RDP via Command Prompt",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1021.002": [
+   {
+    "index": 1,
+    "name": "Map admin share",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Map Admin Share PowerShell",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Copy and Execute File with PsExec",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Execute command writing output to local Admin Share",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1021.004": [
+   {
+    "index": 1,
+    "name": "ESXi - Enable SSH via PowerCLI",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "ESXi - Enable SSH via VIM-CMD",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1021.006": [
+   {
+    "index": 1,
+    "name": "Enable Windows Remote Management",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Remote Code Execution with PS Credentials Using Invoke-Command",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "WinRM Access with Evil-WinRM",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1027": [
+   {
+    "index": 1,
+    "name": "Decode base64 Data into Script",
+    "platforms": [
+     "linux",
+     "macos"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Execute base64-encoded PowerShell",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Execute base64-encoded PowerShell from Windows Registry",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Execution from Compressed File",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "DLP Evasion via Sensitive Data in VBA Macro over email",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "DLP Evasion via Sensitive Data in VBA Macro over HTTP",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Obfuscated Command in PowerShell",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Obfuscated Command Line using special Unicode characters",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 9,
+    "name": "Snake Malware Encrypted crmlog file",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 10,
+    "name": "Execution from Compressed JScript File",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 11,
+    "name": "Obfuscated PowerShell Command via Character Array",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1053.005": [
+   {
+    "index": 1,
+    "name": "Scheduled Task Startup Script",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Scheduled task Local",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Scheduled task Remote",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Powershell Cmdlet Scheduled Task",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "Task Scheduler via VBA",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "WMI Invoke-CimMethod Scheduled Task",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Scheduled Task Executing Base64 Encoded Commands From Registry",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Import XML Schedule Task with Hidden Attribute",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 9,
+    "name": "PowerShell Modify A Scheduled Task",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 10,
+    "name": "Scheduled Task (\"Ghost Task\") via Registry Key Manipulation",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 11,
+    "name": "Scheduled Task Persistence via CompMgmt.msc",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 12,
+    "name": "Scheduled Task Persistence via Eventviewer.msc",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 13,
+    "name": "Turla Topinambour Dropper and Scheduled Task Persistence",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 14,
+    "name": "Turla KopiLuwak Scheduled Task for JavaScript Stager",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1059": [
+   {
+    "index": 1,
+    "name": "AutoIt Script Execution",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1059.001": [
+   {
+    "index": 1,
+    "name": "Mimikatz",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Run BloodHound from local disk",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Run Bloodhound from Memory using Download Cradle",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Mimikatz - Cradlecraft PsSendKeys",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "Invoke-AppPathBypass",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "Powershell MsXml COM object - with prompt",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Powershell XML requests",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Powershell invoke mshta.exe download",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 9,
+    "name": "Powershell Invoke-DownloadCradle",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 10,
+    "name": "PowerShell Fileless Script Execution",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 11,
+    "name": "NTFS Alternate Data Stream Access",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 12,
+    "name": "PowerShell Session Creation and Use",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 13,
+    "name": "ATHPowerShellCommandLineParameter -Command parameter variations",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 14,
+    "name": "ATHPowerShellCommandLineParameter -Command parameter variations with encoded arguments",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 15,
+    "name": "ATHPowerShellCommandLineParameter -EncodedCommand parameter variations",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 16,
+    "name": "ATHPowerShellCommandLineParameter -EncodedCommand parameter variations with encoded arguments",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 17,
+    "name": "PowerShell Command Execution",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 18,
+    "name": "PowerShell Invoke Known Malicious Cmdlets",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 19,
+    "name": "PowerUp Invoke-AllChecks",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 20,
+    "name": "Abuse Nslookup with DNS Records",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 21,
+    "name": "SOAPHound - Dump BloodHound Data",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 22,
+    "name": "SOAPHound - Build Cache",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1071.001": [
+   {
+    "index": 1,
+    "name": "Malicious User Agents - Powershell",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Malicious User Agents - CMD",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Malicious User Agents - Nix",
+    "platforms": [
+     "linux",
+     "macos"
+    ]
+   }
+  ],
+  "T1071.004": [
+   {
+    "index": 1,
+    "name": "DNS Large Query Volume",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "DNS Regular Beaconing",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "DNS Long Domain Query",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "DNS C2",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1078.004": [
+   {
+    "index": 1,
+    "name": "Creating GCP Service Account and Service Account Key",
+    "platforms": [
+     "google-workspace",
+     "iaas:gcp"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Azure Persistence Automation Runbook Created or Modified",
+    "platforms": [
+     "iaas:azure"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "GCP - Create Custom IAM Role",
+    "platforms": [
+     "iaas:gcp"
+    ]
+   }
+  ],
+  "T1090.003": [
+   {
+    "index": 1,
+    "name": "Psiphon",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Tor Proxy Usage - Windows",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Tor Proxy Usage - Debian/Ubuntu/FreeBSD",
+    "platforms": [
+     "linux"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Tor Proxy Usage - MacOS",
+    "platforms": [
+     "macos"
+    ]
+   }
+  ],
+  "T1098": [
+   {
+    "index": 1,
+    "name": "Admin Account Manipulate",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Domain Account and Group Manipulate",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "AWS - Create a group and add a user to that group",
+    "platforms": [
+     "iaas:aws"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Azure AD - adding user to Azure AD role",
+    "platforms": [
+     "azure-ad"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "Azure AD - adding service principal to Azure AD role",
+    "platforms": [
+     "azure-ad"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "Azure - adding user to Azure role in subscription",
+    "platforms": [
+     "iaas:azure"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Azure - adding service principal to Azure role in subscription",
+    "platforms": [
+     "iaas:azure"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Azure AD - adding permission to application",
+    "platforms": [
+     "azure-ad"
+    ]
+   },
+   {
+    "index": 9,
+    "name": "Password Change on Directory Service Restore Mode (DSRM) Account",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 10,
+    "name": "Domain Password Policy Check: Short Password",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 11,
+    "name": "Domain Password Policy Check: No Number in Password",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 12,
+    "name": "Domain Password Policy Check: No Special Character in Password",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 13,
+    "name": "Domain Password Policy Check: No Uppercase Character in Password",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 14,
+    "name": "Domain Password Policy Check: No Lowercase Character in Password",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 15,
+    "name": "Domain Password Policy Check: Only Two Character Classes",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 16,
+    "name": "Domain Password Policy Check: Common Password Use",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 17,
+    "name": "GCP - Delete Service Account Key",
+    "platforms": [
+     "iaas:gcp"
+    ]
+   }
+  ],
+  "T1098.001": [
+   {
+    "index": 1,
+    "name": "Azure AD Application Hijacking - Service Principal",
+    "platforms": [
+     "azure-ad"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Azure AD Application Hijacking - App Registration",
+    "platforms": [
+     "azure-ad"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "AWS - Create Access Key and Secret Key",
+    "platforms": [
+     "iaas:aws"
+    ]
+   }
+  ],
+  "T1098.003": [
+   {
+    "index": 1,
+    "name": "Azure AD - Add Company Administrator Role to a user",
+    "platforms": [
+     "azure-ad"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Simulate - Post BEC persistence via user password reset followed by user added to company administrator role",
+    "platforms": [
+     "azure-ad"
+    ]
+   }
+  ],
+  "T1110.003": [
+   {
+    "index": 1,
+    "name": "Password Spray all Domain Users",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Password Spray (DomainPasswordSpray)",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Password spray all Active Directory domain users with a single password via LDAP against domain controller (NTLM or Kerberos)",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Password spray all Azure AD users with a single password",
+    "platforms": [
+     "azure-ad"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "WinPwn - DomainPasswordSpray Attacks",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "Password Spray Invoke-DomainPasswordSpray Light",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Password Spray Microsoft Online Accounts with MSOLSpray (Azure/O365)",
+    "platforms": [
+     "azure-ad"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Password Spray using Kerbrute Tool",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 9,
+    "name": "AWS - Password Spray an AWS using GoAWSConsoleSpray",
+    "platforms": [
+     "iaas:aws"
+    ]
+   }
+  ],
+  "T1114.003": [
+   {
+    "index": 1,
+    "name": "Office365 - Email Forwarding",
+    "platforms": [
+     "office-365"
+    ]
+   }
+  ],
+  "T1136.003": [
+   {
+    "index": 1,
+    "name": "AWS - Create a new IAM user",
+    "platforms": [
+     "iaas:aws"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Azure AD - Create a new user",
+    "platforms": [
+     "azure-ad"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Azure AD - Create a new user via Azure CLI",
+    "platforms": [
+     "azure-ad"
+    ]
+   }
+  ],
+  "T1204.002": [
+   {
+    "index": 1,
+    "name": "OSTap Style Macro Execution",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "OSTap Payload Download",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Maldoc choice flags command execution",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "OSTAP JS version",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "Office launching .bat file from AppData",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "Excel 4 Macro",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Headless Chrome code execution via VBA",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Potentially Unwanted Applications (PUA)",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 9,
+    "name": "Office Generic Payload Download",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 10,
+    "name": "LNK Payload Download",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 11,
+    "name": "Mirror Blast Emulation",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 12,
+    "name": "ClickFix Campaign - Abuse RunMRU to Launch mshta via PowerShell",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 13,
+    "name": "Simulate Click-Fix via Downloaded BAT File",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1218.005": [
+   {
+    "index": 1,
+    "name": "Mshta executes JavaScript Scheme Fetch Remote Payload With GetObject",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Mshta executes VBScript to execute malicious command",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Mshta Executes Remote HTML Application (HTA)",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Invoke HTML Application - Jscript Engine over Local UNC Simulating Lateral Movement",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "Invoke HTML Application - Jscript Engine Simulating Double Click",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "Invoke HTML Application - Direct download from URI",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Invoke HTML Application - JScript Engine with Rundll32 and Inline Protocol Handler",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Invoke HTML Application - JScript Engine with Inline Protocol Handler",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 9,
+    "name": "Invoke HTML Application - Simulate Lateral Movement over UNC Path",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 10,
+    "name": "Mshta used to Execute PowerShell",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1218.011": [
+   {
+    "index": 1,
+    "name": "Rundll32 execute JavaScript Remote Payload With GetObject",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Rundll32 execute VBscript command",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Rundll32 execute VBscript command using Ordinal number",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Rundll32 advpack.dll Execution",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "Rundll32 ieadvpack.dll Execution",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "Rundll32 syssetup.dll Execution",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Rundll32 setupapi.dll Execution",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Execution of HTA and VBS Files using Rundll32 and URL.dll",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 9,
+    "name": "Launches an executable using Rundll32 and pcwutl.dll",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 10,
+    "name": "Execution of non-dll using rundll32.exe",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 11,
+    "name": "Rundll32 with Ordinal Value",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 12,
+    "name": "Rundll32 with Control_RunDLL",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 13,
+    "name": "Rundll32 with desk.cpl",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 14,
+    "name": "Running DLL with .init extension and function",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 15,
+    "name": "Rundll32 execute command via FileProtocolHandler",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 16,
+    "name": "Rundll32 execute payload by calling RouteTheCall",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1486": [
+   {
+    "index": 1,
+    "name": "Encrypt files using gpg (FreeBSD/Linux)",
+    "platforms": [
+     "linux"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Encrypt files using 7z (FreeBSD/Linux)",
+    "platforms": [
+     "linux"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Encrypt files using ccrypt (FreeBSD/Linux)",
+    "platforms": [
+     "linux"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Encrypt files using openssl (FreeBSD/Linux)",
+    "platforms": [
+     "linux"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "PureLocker Ransom Note",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "Encrypt files using 7z utility - macOS",
+    "platforms": [
+     "macos"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Encrypt files using openssl utility - macOS",
+    "platforms": [
+     "macos"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Data Encrypted with GPG4Win",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 9,
+    "name": "Data Encrypt Using DiskCryptor",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 10,
+    "name": "Akira Ransomware drop Files with .akira Extension and Ransomnote",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1490": [
+   {
+    "index": 1,
+    "name": "Windows - Delete Volume Shadow Copies",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Windows - Delete Volume Shadow Copies via WMI",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Windows - wbadmin Delete Windows Backup Catalog",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Windows - Disable Windows Recovery Console Repair",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "Windows - Delete Volume Shadow Copies via WMI with PowerShell",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "Windows - Delete Backup Files",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Windows - wbadmin Delete systemstatebackup",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Windows - Disable the SR scheduled task",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 9,
+    "name": "Disable System Restore Through Registry",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 10,
+    "name": "Windows - vssadmin Resize Shadowstorage Volume",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 11,
+    "name": "Modify VSS Service Permissions",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 12,
+    "name": "Disable Time Machine",
+    "platforms": [
+     "macos"
+    ]
+   },
+   {
+    "index": 13,
+    "name": "Windows - Delete Volume Shadow Copies via Diskshadow",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1528": [
+   {
+    "index": 1,
+    "name": "Azure - Functions code upload - Functions code injection via Blob upload",
+    "platforms": [
+     "iaas:azure"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Azure - Functions code upload - Functions code injection via File Share modification to retrieve the Functions identity access token",
+    "platforms": [
+     "iaas:azure"
+    ]
+   }
+  ],
+  "T1539": [
+   {
+    "index": 1,
+    "name": "Steal Firefox Cookies (Windows)",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Steal Chrome Cookies (Windows)",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "Steal Chrome Cookies via Remote Debugging (Mac)",
+    "platforms": [
+     "macos"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "Steal Chrome v127+ cookies via Remote Debugging (Windows)",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "Copy Safari BinaryCookies files using AppleScript",
+    "platforms": [
+     "macos"
+    ]
+   }
+  ],
+  "T1564.008": [
+   {
+    "index": 1,
+    "name": "New-Inbox Rule to Hide E-mail in M365",
+    "platforms": [
+     "office-365"
+    ]
+   }
+  ],
+  "T1566.001": [
+   {
+    "index": 1,
+    "name": "Download Macro-Enabled Phishing Attachment",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Word spawned a command shell and used an IP address in the command line",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ],
+  "T1567.002": [
+   {
+    "index": 1,
+    "name": "Exfiltrate data with rclone to cloud Storage - Mega (Windows)",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Exfiltrate data with rclone to cloud Storage - AWS S3",
+    "platforms": [
+     "linux",
+     "macos"
+    ]
+   }
+  ],
+  "T1568.002": [
+   {
+    "index": 1,
+    "name": "DGA Simulation (Python)",
+    "platforms": [
+     "linux"
+    ]
+   }
+  ],
+  "T1569.002": [
+   {
+    "index": 1,
+    "name": "Execute a Command as a Service",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 2,
+    "name": "Use PsExec to execute a command on a remote host",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 3,
+    "name": "psexec.py (Impacket)",
+    "platforms": [
+     "linux"
+    ]
+   },
+   {
+    "index": 4,
+    "name": "BlackCat pre-encryption cmds with Lateral Movement",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 5,
+    "name": "Use RemCom to execute a command on a remote host",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 6,
+    "name": "Snake Malware Service Create",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 7,
+    "name": "Modifying ACL of Service Control Manager via SDET",
+    "platforms": [
+     "windows"
+    ]
+   },
+   {
+    "index": 8,
+    "name": "Pipe Creation - PsExec Tool Execution From Suspicious Locations",
+    "platforms": [
+     "windows"
+    ]
+   }
+  ]
+ },
+ "techniques_without_atomics": [
+  "T1087.004",
+  "T1110",
+  "T1190",
+  "T1213.002",
+  "T1555.005",
+  "T1621",
+  "T1686.001"
+ ]
+}

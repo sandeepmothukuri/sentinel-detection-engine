@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "hunt-hunguestuserinvitedtoprivilegedgroup-name": {
+      "type": "string",
+      "defaultValue": "hunguestuserinvitedtoprivilegedgroup",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the hunting query 'HUN - Guest User Added To Privileged Role / Group'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', parameters('hunt-hunguestuserinvitedtoprivilegedgroup-name'))]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "HUN - Guest User Added To Privileged Role / Group",
+        "category": "Hunting Queries",
+        "query": "let privileged = dynamic([\"Global Administrator\",\"Privileged Role Administrator\",\"Application Administrator\",\"Cloud Application Administrator\",\"Exchange Administrator\",\"SharePoint Administrator\",\"Security Administrator\",\"User Administrator\",\"Helpdesk Administrator\",\"Conditional Access Administrator\"]);\nAuditLogs\n| where TimeGenerated > ago(14d)\n| where OperationName in (\"Add member to role\",\"Add owner to group\",\"Add member to group\")\n| mv-expand t = TargetResources\n| extend TargetUPN = tostring(t.userPrincipalName)\n| extend TargetType = tostring(t.type)\n| extend ModProps = t.modifiedProperties\n| mv-expand mp = ModProps\n| extend Prop = tostring(mp.displayName), NewValue = tostring(mp.newValue)\n| extend RoleName = iff(Prop == \"Role.DisplayName\", replace_regex(NewValue, @\"^\\[\\\"\"|\\\"\"\\]$\", \"\"), \"\")\n| where TargetUPN has \"#EXT#\"\n     or (Prop == \"Role.DisplayName\" and NewValue has_any (privileged))\n| extend Actor = tostring(InitiatedBy.user.userPrincipalName)\n| project TimeGenerated, Actor, OperationName, TargetUPN, RoleName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Hypothesis - Cross-tenant attacks (post-Storm-0558, Midnight Blizzard) often pivot via guest invitations. Surface every guest (UPN contains #EXT#) added to a privileged role, group, or owners list in the last 14 days."
+          },
+          {
+            "name": "tactics",
+            "value": "PrivilegeEscalation,Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098.003,T1136.003"
+          }
+        ]
+      }
+    }
+  ]
+}

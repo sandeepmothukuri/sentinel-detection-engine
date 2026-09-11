@@ -1,0 +1,99 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-azurensgopentointernet-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a0b",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'Azure - NSG Rule Opens Port to 0.0.0.0/0'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-azurensgopentointernet-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "Azure - NSG Rule Opens Port to 0.0.0.0/0",
+        "description": "Detects creation or update of an NSG rule that allows inbound traffic from\nInternet / Any (0.0.0.0/0, *) on a sensitive port (22, 3389, 1433, 3306, 5432,\n6379, 27017, 9200). Common cause of accidental exposure and the precursor to\nbrute-force / RCE chains.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "let sensitive_ports = dynamic([\"22\",\"3389\",\"1433\",\"3306\",\"5432\",\"6379\",\"27017\",\"9200\",\"5984\",\"11211\"]);\nlet excluded_callers = dynamic([]);\nAzureActivity\n| where TimeGenerated > ago(1h)\n| where OperationNameValue endswith \"SECURITYRULES/WRITE\"\n| where ActivityStatusValue in (\"Success\",\"Succeeded\")\n| extend props = parse_json(tostring(Properties))\n| extend reqBody = parse_json(tostring(props.requestbody))\n| extend ruleProps = parse_json(tostring(reqBody.properties))\n| extend SourcePrefix = tostring(ruleProps.sourceAddressPrefix)\n| extend DestPortRange = tostring(ruleProps.destinationPortRange)\n| extend Access = tostring(ruleProps.access)\n| extend Direction = tostring(ruleProps.direction)\n| where Direction =~ \"Inbound\" and Access =~ \"Allow\"\n| where SourcePrefix in (\"*\",\"0.0.0.0/0\",\"Internet\",\"Any\")\n| where DestPortRange in (sensitive_ports) or DestPortRange == \"*\"\n| where Caller !in (excluded_callers)\n| project TimeGenerated, Caller, CallerIpAddress, ResourceId, ResourceGroup,\n          SourcePrefix, DestPortRange, Access, Direction\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "InitialAccess",
+          "DefenseEvasion"
+        ],
+        "techniques": [
+          "T1190",
+          "T1686.001"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "Caller"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "CallerIpAddress"
+              }
+            ]
+          },
+          {
+            "entityType": "AzureResource",
+            "fieldMappings": [
+              {
+                "identifier": "ResourceId",
+                "columnName": "ResourceId"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT6H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "AzureResource"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "NSG rule exposes port {{DestPortRange}} to the internet",
+          "alertDescriptionFormat": "{{Caller}} created or updated an NSG rule allowing {{SourcePrefix}} inbound on {{DestPortRange}} in resource group {{ResourceGroup}}."
+        }
+      }
+    }
+  ]
+}

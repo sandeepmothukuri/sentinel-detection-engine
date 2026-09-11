@@ -1,0 +1,11 @@
+flowchart TB
+  subgraph REL["release.yml — published on a v*.*.* tag"]
+    direction LR
+    V["Re-run the full validation pipeline"] --> PACK["Build the release archive<br/>Detections · Hunting Queries · deploy (ARM)<br/>Playbooks · Workbooks · attack-navigator<br/>coverage.md · tests/atomics.md<br/>docs · scripts · tests"]
+    PACK --> SUM["SHA256 checksum file"] --> GH["GitHub release<br/>notes from the commit range"]
+  end
+  subgraph PRR["pr-detection-report.yml — on every pull request"]
+    direction LR
+    DIFF["pr_diff_report.py<br/>which rules changed, was the version bumped"] --> CMT["Sticky pull-request comment<br/>detection diff summary"]
+  end
+  REL --> PRR

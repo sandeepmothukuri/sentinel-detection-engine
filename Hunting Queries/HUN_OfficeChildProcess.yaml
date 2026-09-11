@@ -52,3 +52,7 @@ limitations: |
   spawning a child. Office spawned children are also invisible on non-MDE
   endpoints. 24h window suits interactive hunting cadence.
 version: 1.1.0
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.yaml

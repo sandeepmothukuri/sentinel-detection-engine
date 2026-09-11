@@ -6,8 +6,8 @@
 
 | Dimension | Score | Notes |
 |---|---:|---|
-| 1. Detection breadth (ATT&CK coverage) | 2.5 | 31 techniques across 11 tactics — covers identity, cloud, endpoint; gaps in Impact + LateralMovement |
-| 2. Detection engineering rigour | 3.0 | YAML-as-code, CI validation, ATT&CK mapping, ART validation per rule |
+| 1. Detection breadth (ATT&CK coverage) | 3.0 | 37 techniques across 12 of 14 tactics — identity, cloud, endpoint, plus Impact and LateralMovement families added; gaps in Reconnaissance + ResourceDevelopment |
+| 2. Detection engineering rigour | 3.0 | YAML-as-code, 15-family CI validator, ATT&CK mapping validated against a vendored MITRE dataset, per-rule validation ledger with upstream-verified atomic citations, negative tests for the validator itself |
 | 3. Telemetry coverage | 2.5 | Entra ID + M365 + MDE + AzureActivity + KeyVault; no on-prem AD, no network IDS, no DLP |
 | 4. Triage process | 3.0 | Documented SOP, tiered hand-off, dispositioning labels, MTTA/MTTR tracking |
 | 5. Containment automation | 2.5 | 4 SOAR playbooks (enrich+disable, isolate, ticket, firewall block); manual-only for cloud workload kills |
@@ -15,8 +15,8 @@
 | 7. Threat intel integration | 1.5 | VT + AbuseIPDB enrichment; no MISP, no TAXII feeds, no internal IOC lifecycle |
 | 8. Postmortem / learning loop | 2.5 | Template + required sections; no blameless-incident review process documented |
 | 9. Metrics + reporting | 2.5 | Workbook KPIs (MTTA, MTTR, FP rate); no exec-level scorecard yet |
-| 10. Purple-team validation | 3.0 | Atomic Red Team mapping per rule; CI doesn't yet run live ART against a staging tenant |
-| **Weighted average** | **2.6** | Strong mid-tier; clear next steps to push toward 3.5 |
+| 10. Purple-team validation | 2.5 | Atomic Red Team mapping exists for 14 of 28 rules with 31 upstream-verified citations and a written manual procedure for the rest, but nothing has been executed: no atomic test has been run against any tenant |
+| **Weighted average** | **2.5** | Breadth and rigour improved; validation maturity is scored honestly lower than before, because the ledger now makes the execution gap explicit instead of leaving it implied |
 
 ## Maturity-band definitions
 
@@ -28,9 +28,15 @@
 
 ## Per-dimension detail and roadmap
 
-### 1. Detection breadth — 2.5 → goal 3.0
-- Add 4 LateralMovement detections (T1021.002 SMB admin, T1021.006 WinRM, T1550.002 PtH, T1563.002 RDP hijack)
-- Add 3 Impact detections (T1486 mass file modification rate, T1490 shadow-copy delete, T1485 data destruction)
+### 1. Detection breadth — 3.0 → goal 3.5
+- **Done:** LateralMovement raised to T1021.002 (admin-share execution to PsExec-style service
+  execution) and T1021.006 (WinRM remote execution); Impact raised from zero to T1486 (mass file
+  rename) and T1490 (shadow copy and recovery inhibition).
+- **Remaining:** T1550.002 (pass-the-hash) and T1563.002 (RDP session hijacking) need authentication
+  telemetry this pack does not ingest; T1485 (data destruction) overlaps T1490 closely enough that a
+  separate rule would be duplicate content, so it is deliberately not added.
+- **Remaining:** Reconnaissance and Resource Development require external attack-surface or
+  brand-monitoring data, out of scope for a Sentinel-only pack.
 
 ### 2. Detection engineering rigour — 3.0 → goal 4.0
 - Generate per-rule unit tests by running ART in a staging tenant nightly and asserting the rule fires within N minutes
@@ -52,6 +58,17 @@
 ### 8. Postmortem loop — 2.5 → goal 3.5
 - Adopt the **blameless** postmortem template (link contributing factors to systems, not people)
 - Quarterly review: pull every postmortem's action items, score completion rate
+
+### 10. Purple-team validation — 2.5 → goal 4.0
+- The mapping half is done: [`tests/validation/atomics.yaml`](../../tests/validation/atomics.yaml)
+  cites 31 Atomic Red Team tests that were verified to exist upstream, marks the four that only
+  partially exercise a rule, and documents a manual procedure for the 14 rules no atomic can reach.
+  `scripts/ci_validate.py` fails the build if a citation points at a test that does not exist.
+- The execution half is entirely undone. No atomic has been run, so every rule sits at
+  `STATIC VALIDATION`. A mapping is not validation: it is a plan.
+- Next: run the manual procedures in a lab workspace and record them with
+  [`tests/validation/evidence-template.md`](../../tests/validation/evidence-template.md). That is
+  the single highest-value action available, and it needs a tenant rather than more code.
 
 ## How to use this document
 

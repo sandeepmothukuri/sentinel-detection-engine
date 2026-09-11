@@ -23,6 +23,16 @@ RULE_DIRS = [REPO / "Detections", REPO / "Hunting Queries"]
 COVERAGE_MD = REPO / "coverage.md"
 LAYER_JSON = REPO / "attack-navigator" / "layer.json"
 
+# Microsoft Sentinel's analytics-rule schema uses the classic enterprise tactic
+# vocabulary. Listing it here means an uncovered tactic is reported as a gap
+# instead of being invisible.
+SENTINEL_TACTICS = [
+    "Reconnaissance", "ResourceDevelopment", "InitialAccess", "Execution",
+    "Persistence", "PrivilegeEscalation", "DefenseEvasion", "CredentialAccess",
+    "Discovery", "LateralMovement", "Collection", "CommandAndControl",
+    "Exfiltration", "Impact",
+]
+
 
 def collect() -> list[dict]:
     rules = []
@@ -54,6 +64,7 @@ def write_coverage_md(rules: list[dict]) -> None:
         for t in r["techniques"]:
             by_tech[t].append(r)
     all_tactics = sorted({t for r in rules for t in r["tactics"]})
+    unknown_tactics = [t for t in all_tactics if t not in SENTINEL_TACTICS]
     lines = [
         "# ATT&CK Coverage",
         "",
@@ -62,10 +73,45 @@ def write_coverage_md(rules: list[dict]) -> None:
         f"- **Rules:** {sum(1 for r in rules if r['kind']=='Detection')} detections + "
         f"{sum(1 for r in rules if r['kind']=='Hunt')} hunts",
         f"- **Unique techniques:** {len(by_tech)}",
-        f"- **Tactics covered:** {len(all_tactics)} ({', '.join(all_tactics)})",
+        f"- **Tactics covered:** {len(all_tactics)} of {len(SENTINEL_TACTICS)} "
+        f"({', '.join(all_tactics)})",
         "",
         "Technique IDs are validated against the vendored ATT&CK dataset "
         "(`scripts/attack_data.json`, built from MITRE CTI) by `scripts/ci_validate.py`.",
+        "",
+        "## Coverage by tactic",
+        "",
+        "Rule-level counts: a rule that declares four tactics is counted in each of them.",
+        "",
+        "| Tactic | Scheduled rules | Hunting queries | Total rules |",
+        "|---|---|---|---|",
+    ]
+    tactic_rows = []
+    for tactic in all_tactics:
+        dets = sum(1 for r in rules if r["kind"] == "Detection" and tactic in r["tactics"])
+        hunts = sum(1 for r in rules if r["kind"] == "Hunt" and tactic in r["tactics"])
+        tactic_rows.append((tactic, dets, hunts))
+    lines += [f"| {t} | {d} | {h} | {d + h} |" for t, d, h in tactic_rows]
+    lines += [
+        "",
+        "## Enterprise tactics with no coverage",
+        "",
+        "| Tactic | Rules |",
+        "|---|---|",
+    ]
+    counts = {t: d + h for t, d, h in tactic_rows}
+    uncovered = [t for t in SENTINEL_TACTICS if counts.get(t, 0) == 0]
+    if uncovered:
+        lines += [f"| {t} | none |" for t in uncovered]
+        lines += [
+            "",
+            "An uncovered tactic is a stated gap, not an oversight: it is recorded in "
+            "`tests/validation/performance-metrics.md` and in the roadmap rather than "
+            "closed with a rule that cannot fire.",
+        ]
+    else:
+        lines += ["| none | all 14 enterprise tactics have at least one rule |"]
+    lines += [
         "",
         "## Techniques → Rules",
         "",
@@ -97,7 +143,10 @@ def write_navigator_layer(rules: list[dict]) -> None:
         })
     layer = {
         "name": "sentinel-detection-engine coverage",
-        "versions": {"attack": "18", "navigator": "5.1.0", "layer": "4.5"},
+        # ATT&CK v19 (28 April 2026) retired Defense Evasion: TA0005 now denotes
+        # Stealth, and Defense Impairment is TA0112. The vendored CTI snapshot in
+        # scripts/attack_data.json is v19, so the layer declares v19 too.
+        "versions": {"attack": "19", "navigator": "5.1.0", "layer": "4.5"},
         "domain": "enterprise-attack",
         "description": "ATT&CK coverage produced by github.com/sandeepmothukuri/sentinel-detection-engine",
         "techniques": techniques,

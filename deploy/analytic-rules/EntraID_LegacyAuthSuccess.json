@@ -1,0 +1,92 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-entraidlegacyauthsuccess-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a03",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'Entra ID - Successful Legacy Auth Sign-In'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-entraidlegacyauthsuccess-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "Entra ID - Successful Legacy Auth Sign-In",
+        "description": "Detects successful sign-ins over legacy authentication protocols\n(POP, IMAP, SMTP AUTH, MAPI, Exchange ActiveSync without modern auth, etc.).\nLegacy auth bypasses Conditional Access and MFA and is the #1 vector for\npassword spray. Successful legacy auth is almost always malicious in estates\nthat have fully rolled out modern auth.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "// Genuinely legacy/basic-auth protocol identifiers only. AutoDiscover and\n// \"Exchange Web Services\" are deliberately excluded: modern OAuth clients emit\n// them too (Outlook for Mac, third-party EWS integrations), so including them\n// produced false positives on healthy estates without adding detection value.\n// Add them back via the tuning guidance only if your tenant still fronts EWS\n// with basic auth.\nlet legacy_clients = dynamic([\n  \"Other clients; POP\",\n  \"Other clients; IMAP\",\n  \"Other clients; SMTP\",\n  \"Other clients; MAPI\",\n  \"Other clients; Exchange ActiveSync\",\n  \"Authenticated SMTP\"\n]);\nlet excluded_users = dynamic([]);\nSigninLogs\n| where TimeGenerated > ago(1h)\n| where ResultType == 0\n| where ClientAppUsed in (legacy_clients)\n| where UserPrincipalName !in (excluded_users)\n| project TimeGenerated, UserPrincipalName, IPAddress, ClientAppUsed,\n          AppDisplayName, UserAgent, Location\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "InitialAccess",
+          "DefenseEvasion",
+          "CredentialAccess"
+        ],
+        "techniques": [
+          "T1110",
+          "T1078.004"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "UserPrincipalName"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "IPAddress"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT12H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Account",
+              "IP"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Legacy auth sign-in for {{UserPrincipalName}}",
+          "alertDescriptionFormat": "{{UserPrincipalName}} authenticated successfully over {{ClientAppUsed}} from {{IPAddress}}. Legacy protocols bypass Conditional Access and MFA."
+        }
+      }
+    }
+  ]
+}

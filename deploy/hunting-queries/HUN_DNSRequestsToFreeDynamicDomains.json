@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "hunt-hundnsrequeststofreedynamicdomains-name": {
+      "type": "string",
+      "defaultValue": "hundnsrequeststofreedynamicdomains",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the hunting query 'HUN - DNS Queries to Free / Dynamic / Tunneling TLDs'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', parameters('hunt-hundnsrequeststofreedynamicdomains-name'))]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "HUN - DNS Queries to Free / Dynamic / Tunneling TLDs",
+        "category": "Hunting Queries",
+        "query": "let bad_tlds = dynamic([\".xyz\",\".top\",\".click\",\".tk\",\".gq\",\".cf\",\".ml\",\".icu\",\".rest\",\".country\",\".buzz\",\".cyou\"]);\nlet dyn_dns = dynamic([\"duckdns.org\",\"no-ip.com\",\"no-ip.org\",\"ddns.net\",\"hopto.org\",\"zapto.org\",\"dynu.net\",\"dnsexit.com\",\"sytes.net\",\"myftp.org\",\"servehttp.com\"]);\nDeviceNetworkEvents\n| where TimeGenerated > ago(24h)\n| where ActionType in (\"ConnectionSuccess\",\"DnsConnectionInspected\",\"ConnectionAttempt\")\n| where isnotempty(RemoteUrl)\n| extend host = tolower(tostring(RemoteUrl))\n| extend Domain = parse_url(host).Host\n// Take the last label explicitly. Negative indexing of a dynamic array is not\n// supported by the documented accessor semantics; derive the index from\n// array_length instead so the expression is unambiguous.\n| extend DomainLabels = split(Domain, \".\")\n| extend Tld = strcat(\".\", tostring(DomainLabels[array_length(DomainLabels) - 1]))\n| where host has_any (dyn_dns) or Tld in (bad_tlds)\n| project TimeGenerated, DeviceName, AccountName, host, Domain, Tld, RemoteIP,\n          InitiatingProcessFileName, InitiatingProcessCommandLine\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Hypothesis - Free dynamic-DNS providers (duckdns.org, no-ip.com, dynu, dnsexit) and abused new-gTLDs (.xyz, .top, .click, .tk, .gq, .cf, .ml, .icu) are over-represented in commodity-malware C2. Surface every endpoint DNS query matching this"
+          },
+          {
+            "name": "tactics",
+            "value": "CommandAndControl"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1071.004,T1568.002"
+          }
+        ]
+      }
+    }
+  ]
+}

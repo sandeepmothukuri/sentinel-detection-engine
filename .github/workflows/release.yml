@@ -4,72 +4,126 @@ on:
   push:
     tags: ["v*.*.*"]
 
+# Least privilege at the top level. Only the job that publishes the release is
+# granted write access, and that job runs no code from an untrusted source.
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  # The release gate is the same workflow that runs on every pull request. A
+  # release that skips validation is not a release.
+  validate:
+    uses: ./.github/workflows/validate.yml
+    secrets: inherit
+
   release:
+    name: Publish release archive
+    needs: validate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write     # scoped to this job only
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the tagged commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
 
-      - name: Install
-        run: pip install pyyaml
+      - name: Install validators
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml yamllint pytest
 
-      - name: Validate before releasing
+      - name: Re-verify the tagged tree
         run: |
           python scripts/ci_validate.py
+          python -m pytest tests -q
           python scripts/generate_coverage.py
-          git diff --exit-code coverage.md attack-navigator/layer.json
+          python scripts/generate_atomics_ledger.py
+          python scripts/generate_arm_templates.py
+          if ! git diff --exit-code coverage.md attack-navigator/layer.json tests/atomics.md deploy; then
+            echo "::error::generated artefacts do not match the tagged tree"
+            exit 1
+          fi
 
-      - name: Pack rules into release archive
+      - name: Build the release archive
         run: |
+          set -euo pipefail
+          name="sentinel-detection-engine-${GITHUB_REF_NAME}"
           mkdir -p dist
-          tar czf dist/sentinel-detection-engine-${GITHUB_REF_NAME}.tar.gz \
+          # The archive is self-contained: content to deploy, plus the scripts and
+          # tests needed to re-verify it without cloning the repository.
+          tar czf "dist/${name}.tar.gz" \
+            --exclude='__pycache__' \
+            --exclude='.pytest_cache' \
             Detections \
             'Hunting Queries' \
+            deploy \
             Workbooks \
             Playbooks \
             attack-navigator \
             coverage.md \
-            tests/atomics.md \
+            docs \
+            scripts \
+            tests \
+            .github/workflows \
+            .yamllint.yml \
             README.md \
             LICENSE
-          (cd dist && sha256sum sentinel-detection-engine-${GITHUB_REF_NAME}.tar.gz > sentinel-detection-engine-${GITHUB_REF_NAME}.sha256)
+          (cd dist && sha256sum "${name}.tar.gz" > "${name}.sha256")
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+        id: pack
 
-      - name: Generate changelog from commits
-        id: changelog
+      - name: Generate release notes from the commit range
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p')
-          if [ -z "$PREV_TAG" ]; then
-            RANGE=""
-          else
-            RANGE="${PREV_TAG}..HEAD"
-          fi
+          set -euo pipefail
+          prev_tag="$(git tag --sort=-creatordate | grep -v "^${REF_NAME}$" | head -n1 || true)"
           {
-            echo "## Changes since ${PREV_TAG:-the beginning}"
+            echo "## Release ${REF_NAME}"
             echo
-            git log --pretty=format:'- %s (%h)' $RANGE -- Detections "Hunting Queries" Workbooks Playbooks scripts .github/workflows | sed 's/^- //; s/^/- /'
+            echo "Detection content, hunting queries, playbooks and workbooks as validated by CI."
             echo
-            echo "## Coverage snapshot"
-            python -c "
-            import re, pathlib
-            md = pathlib.Path('coverage.md').read_text()
-            m = re.search(r'- \*\*Rules:.*\n.*\n.*', md)
-            print(m.group(0) if m else 'see coverage.md')
-            "
-          } > CHANGELOG_RELEASE.md
+            if [ -n "${prev_tag}" ]; then
+              echo "### Changes since ${prev_tag}"
+            else
+              echo "### Changes since the start of the repository"
+            fi
+            echo
+            git log --no-merges --pretty=format:'- %s (%h)' "${prev_tag:+${prev_tag}..}HEAD" \
+              -- Detections 'Hunting Queries' Workbooks Playbooks scripts tests docs .github/workflows
+            echo
+            echo
+            echo "### Coverage snapshot"
+            echo
+            sed -n '1,12p' coverage.md
+            echo
+            echo "### Import note"
+            echo
+            echo "The Sentinel Repositories (GitOps) connection deploys ARM templates, not the"
+            echo "rule YAML used for authoring. This archive contains both: the authoring YAML"
+            echo "under Detections/ and Hunting Queries/, and the generated ARM templates under"
+            echo "deploy/ that a repository connection consumes. No template in this archive has"
+            echo "been deployed to a tenant. See docs/deployment.md and docs/limitations.md."
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
 
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+      - name: Publish the release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2.6.2
         with:
-          body_path: CHANGELOG_RELEASE.md
+          body_path: RELEASE_NOTES.md
           files: |
             dist/sentinel-detection-engine-*.tar.gz
             dist/sentinel-detection-engine-*.sha256
+          fail_on_unmatched_files: true

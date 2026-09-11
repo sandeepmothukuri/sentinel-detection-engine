@@ -25,7 +25,7 @@ Tuning is a controlled loop, not a reaction to a noisy week. This page defines t
 ## Threshold conventions in this pack
 
 - All thresholds are named `let` values with a `_threshold` suffix (`velocity_kmh_threshold`, `failed_mfa_threshold`, `abs_threshold`...).
-- Baseline (z-score) rules: tune the absolute floor (`abs_threshold`) for volume, the multiplier (`> 3.0`) for sensitivity — the 30-day baseline self-adjusts to most seasonal patterns.
+- Baseline (z-score) rules: tune the absolute floor (`abs_threshold`) for volume, the multiplier (`> 3.0`) for sensitivity — the 14-day baseline self-adjusts to most seasonal patterns.
 - Time windows (`queryFrequency` / `queryPeriod`) are production SLAs, not tuning knobs; changing them changes detection latency and should be a standalone PR.
 
 ## Metrics feedback

@@ -58,3 +58,7 @@ limitations: |
   Group membership grants to guests via group-based PIM are only visible when
   the "Add member to group" event fires.
 version: 1.1.0
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.yaml

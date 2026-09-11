@@ -1,0 +1,98 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-mdemshtaremotescript-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a09",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'MDE - mshta Executing Remote Script'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-mdemshtaremotescript-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "MDE - mshta Executing Remote Script",
+        "description": "Detects mshta.exe invoked with an http(s):// URL, javascript:, or vbscript:\nprefix. Used by trojanised LNK / ISO / OneNote payloads to fetch and execute\nremote HTAs without writing to disk.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "DeviceProcessEvents\n| where TimeGenerated > ago(1h)\n| where FileName =~ \"mshta.exe\"\n| where ProcessCommandLine matches regex @\"(?i)(https?://|javascript:|vbscript:|about:)\"\n| extend ParentFile = tostring(InitiatingProcessFileName)\n| project TimeGenerated, DeviceId, DeviceName, AccountName, ProcessCommandLine,\n          ParentFile, InitiatingProcessCommandLine, FolderPath\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "DefenseEvasion",
+          "Execution"
+        ],
+        "techniques": [
+          "T1218.005"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "DeviceName"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "AccountName"
+              }
+            ]
+          },
+          {
+            "entityType": "Process",
+            "fieldMappings": [
+              {
+                "identifier": "CommandLine",
+                "columnName": "ProcessCommandLine"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT12H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Host"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "mshta executing a remote script on {{DeviceName}}",
+          "alertDescriptionFormat": "mshta.exe on {{DeviceName}} was launched with a remote or script-scheme payload, parent process {{ParentFile}}."
+        }
+      }
+    }
+  ]
+}

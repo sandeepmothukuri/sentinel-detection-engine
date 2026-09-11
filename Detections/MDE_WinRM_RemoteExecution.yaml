@@ -1,0 +1,102 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a0f
+name: MDE - WinRM Remote Command Execution
+description: |
+  Detects a command or script interpreter spawned by wsmprovhost.exe, the WinRM
+  host process. Anything that reaches a Windows host over WinRM
+  (Invoke-Command / Enter-PSSession / a remote-session tool) executes as a child
+  of wsmprovhost, so this pattern is the cleanest endpoint-side indicator of
+  remote-management-tool lateral movement (T1021.006). Commonly seen in
+  hands-on-keyboard intrusions and in the Akira/BlackByte affiliate playbooks.
+severity: Medium
+status: Available
+kind: Scheduled
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - LateralMovement
+  - Execution
+relevantTechniques:
+  - T1021.006
+query: |
+  // Interpreters and reconnaissance utilities that arrive through a WinRM
+  // session. Build/CI and configuration-management agents land here too — see
+  // tuningGuidance for the parent-process allow-list.
+  let remote_shell_children = dynamic([
+    "cmd.exe", "powershell.exe", "pwsh.exe", "cscript.exe", "wscript.exe",
+    "net.exe", "net1.exe", "whoami.exe", "hostname.exe", "ipconfig.exe",
+    "systeminfo.exe", "nltest.exe", "wevtutil.exe", "sc.exe",
+    "schtasks.exe", "reg.exe", "wmic.exe", "certutil.exe", "bitsadmin.exe",
+    "mshta.exe", "rundll32.exe", "curl.exe", "quser.exe",
+    "tasklist.exe", "netstat.exe", "arp.exe", "route.exe", "dsquery.exe"
+  ]);
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where InitiatingProcessFileName =~ "wsmprovhost.exe"
+  | where FileName in~ (remote_shell_children)
+  | project TimeGenerated, DeviceId, DeviceName, AccountName, FileName,
+            ProcessCommandLine, FolderPath, SHA256,
+            InitiatingProcessFileName, InitiatingProcessCommandLine,
+            InitiatingProcessAccountName, InitiatingProcessAccountDomain
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+  - entityType: Process
+    fieldMappings:
+      - identifier: CommandLine
+        columnName: ProcessCommandLine
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT12H
+    matchingMethod: Selected
+    groupByEntities:
+      - Host
+      - Account
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: WinRM command execution on {{DeviceName}}
+  alertDescriptionFormat: >-
+    {{FileName}} was launched by wsmprovhost.exe (WinRM) on {{DeviceName}} under
+    account {{AccountName}}: {{ProcessCommandLine}}
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: DeviceProcessEvents (Microsoft Defender for Endpoint / M365 advanced hunting). WinRM must be enabled on the target (5985/5986); the accounting is on InitiatingProcessFileName = wsmprovhost.exe, so no additional telemetry is required beyond standard process events.
+  falsePositives: |
+    - Configuration-management and orchestration platforms that drive Windows
+      over PowerShell remoting: Ansible (WinRM), Chef, Puppet, Terraform
+      winrm provisioners, Rundeck.
+    - Administrators running ad-hoc Invoke-Command for a documented change.
+    - Monitoring agents that execute health checks over WinRM.
+  tuningGuidance: |
+    - The fastest noise reduction is a parent allow-list on
+      InitiatingProcessAccountName / InitiatingProcessCommandLine for your
+      orchestration service accounts. Add those before touching the child list,
+      because the child list is the detection.
+    - Where orchestration is unavoidable and always lands on the same accounts,
+      consider promoting the exclusion to a watchlist rather than editing the
+      query, so the exception is owned and reviewed.
+    - A WinRM-spawned shell from an interactive user account on a workstation —
+      as opposed to a service account on a server — is the escalation trigger in
+      the triage SOP.
+  suppression: |
+    No static suppression. Orchestration accounts are allow-listed by name with a
+    documented owner; VMware/hypervisor management accounts are not exempt.
+  expectedVolume: Medium in estates with PowerShell-remoting automation; low otherwise. Expect bursts during patching windows.
+version: 1.0.0

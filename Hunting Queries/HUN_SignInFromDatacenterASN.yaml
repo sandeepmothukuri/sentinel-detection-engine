@@ -12,8 +12,9 @@ hypothesis: |
   ASNs. If true, affected accounts will show datacenter-ASN sign-ins close in
   time to phishing emails or MFA prompt anomalies.
 requiredTelemetry: |
-  SigninLogs via the Entra ID connector with AutonomousSystemNumber
-  populated.
+  SigninLogs via the Entra ID connector with AutonomousSystemNumber populated
+  (string type). ASN numbers are matched as strings — keep the allow-list quoted
+  when extending it.
 tactics:
   - InitialAccess
   - DefenseEvasion
@@ -26,8 +27,11 @@ requiredDataConnectors:
     dataTypes:
       - SigninLogs
 query: |
-  let dc_asns = dynamic([14061, 16276, 24940, 20473, 63949, 16509, 8075, 15169,
-                        20454, 36352, 53667, 51852, 199524, 14618, 396982]);
+  // AutonomousSystemNumber is a *string* column in SigninLogs (per the Azure
+  // Monitor Logs schema). The allow-list must therefore hold strings: an integer
+  // list silently matches nothing, because `in` does not coerce int -> string.
+  let dc_asns = dynamic(["14061","16276","24940","20473","63949","16509","8075","15169",
+                        "20454","36352","53667","51852","199524","14618","396982"]);
   SigninLogs
   | where TimeGenerated > ago(24h)
   | where ResultType == 0
@@ -58,3 +62,7 @@ limitations: |
   legit workloads on VPS providers will need additional AppDisplayName
   exclusions.
 version: 1.1.0
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.yaml

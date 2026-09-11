@@ -1,0 +1,99 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-mdewinrmremoteexecution-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a0f",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'MDE - WinRM Remote Command Execution'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-mdewinrmremoteexecution-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "MDE - WinRM Remote Command Execution",
+        "description": "Detects a command or script interpreter spawned by wsmprovhost.exe, the WinRM\nhost process. Anything that reaches a Windows host over WinRM\n(Invoke-Command / Enter-PSSession / a remote-session tool) executes as a child\nof wsmprovhost, so this pattern is the cleanest endpoint-side indicator of\nremote-management-tool lateral movement (T1021.006). Commonly seen in\nhands-on-keyboard intrusions and in the Akira/BlackByte affiliate playbooks.\n",
+        "severity": "Medium",
+        "enabled": true,
+        "query": "// Interpreters and reconnaissance utilities that arrive through a WinRM\n// session. Build/CI and configuration-management agents land here too — see\n// tuningGuidance for the parent-process allow-list.\nlet remote_shell_children = dynamic([\n  \"cmd.exe\", \"powershell.exe\", \"pwsh.exe\", \"cscript.exe\", \"wscript.exe\",\n  \"net.exe\", \"net1.exe\", \"whoami.exe\", \"hostname.exe\", \"ipconfig.exe\",\n  \"systeminfo.exe\", \"nltest.exe\", \"wevtutil.exe\", \"sc.exe\",\n  \"schtasks.exe\", \"reg.exe\", \"wmic.exe\", \"certutil.exe\", \"bitsadmin.exe\",\n  \"mshta.exe\", \"rundll32.exe\", \"curl.exe\", \"quser.exe\",\n  \"tasklist.exe\", \"netstat.exe\", \"arp.exe\", \"route.exe\", \"dsquery.exe\"\n]);\nDeviceProcessEvents\n| where TimeGenerated > ago(1h)\n| where InitiatingProcessFileName =~ \"wsmprovhost.exe\"\n| where FileName in~ (remote_shell_children)\n| project TimeGenerated, DeviceId, DeviceName, AccountName, FileName,\n          ProcessCommandLine, FolderPath, SHA256,\n          InitiatingProcessFileName, InitiatingProcessCommandLine,\n          InitiatingProcessAccountName, InitiatingProcessAccountDomain\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "LateralMovement",
+          "Execution"
+        ],
+        "techniques": [
+          "T1021.006"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "DeviceName"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "AccountName"
+              }
+            ]
+          },
+          {
+            "entityType": "Process",
+            "fieldMappings": [
+              {
+                "identifier": "CommandLine",
+                "columnName": "ProcessCommandLine"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT12H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Host",
+              "Account"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "WinRM command execution on {{DeviceName}}",
+          "alertDescriptionFormat": "{{FileName}} was launched by wsmprovhost.exe (WinRM) on {{DeviceName}} under account {{AccountName}}: {{ProcessCommandLine}}"
+        }
+      }
+    }
+  ]
+}

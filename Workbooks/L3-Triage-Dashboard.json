@@ -4,7 +4,7 @@
     {
       "type": 1,
       "content": {
-        "json": "# L3 Triage Dashboard\nIncident KPIs, severity distribution, top detections, ATT&CK coverage, tuning indicators, and active incidents.\n\n*Author: Sandeep Mothukuri — part of [sentinel-detection-engine](https://github.com/sandeepmothukuri/sentinel-detection-engine)*"
+        "json": "# L3 Triage Dashboard\nIncident KPIs, severity distribution, top firing detections, ATT&CK tactic spread, entity hotspots, MTTA/MTTR, closure classification, tuning candidates, SLA breaches and the open queue.\n\n*Author: Sandeep Mothukuri — part of [sentinel-detection-engine](https://github.com/sandeepmothukuri/sentinel-detection-engine)*\n\n> Every panel is computed from `SecurityIncident` / `SecurityAlert` in the workspace this workbook is deployed to. Nothing here is sample data: on a workspace with no incidents the tiles render empty, which is the correct answer, not a fault.\n\n> **Closure discipline note.** The closure-classification and tuning panels read the `Classification` column. An incident that was never triaged shows as Undetermined and is *not* counted as a false positive — precision figures are only meaningful once analysts close incidents properly."
       },
       "name": "Header"
     },
@@ -17,8 +17,12 @@
             "id": "timerange",
             "version": "KqlParameterItem/1.0",
             "name": "TimeRange",
+            "label": "Time range",
             "type": 4,
-            "value": { "durationMs": 86400000 },
+            "isRequired": true,
+            "value": {
+              "durationMs": 86400000
+            },
             "typeSettings": {
               "selectableValues": [
                 { "durationMs": 3600000 },
@@ -39,10 +43,16 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "let created = SecurityIncident | where TimeGenerated {TimeRange} | summarize Created = dcount(IncidentNumber);\nlet open = SecurityIncident | where TimeGenerated {TimeRange} | summarize arg_max(TimeGenerated, *) by IncidentNumber | where Status =~ \"New\" or Status =~ \"Active\" | count | project Open = Count;\nlet closed = SecurityIncident | where TimeGenerated {TimeRange} | summarize arg_max(TimeGenerated, *) by IncidentNumber | where Status =~ \"Closed\" | count | project Closed = Count;\ncreated | extend dummy = 1 | join kind=inner (open | extend dummy = 1) on dummy | join kind=inner (closed | extend dummy = 1) on dummy | project Created, Open, Closed",
-        "size": 0,
-        "title": "Incident KPIs",
-        "visualization": "table"
+        "query": "// Latest state of each incident in the window. SecurityIncident appends a new\n// row on every modification, so arg_max per IncidentNumber is mandatory before\n// any counting.\nlet incidents =\n    SecurityIncident\n    | where TimeGenerated {TimeRange}\n    | summarize arg_max(TimeGenerated, *) by IncidentNumber;\nincidents\n| summarize\n    ['Incidents touched'] = count(),\n    ['Open'] = countif(Status in~ ('New', 'Active')),\n    ['Closed'] = countif(Status =~ 'Closed'),\n    ['High open'] = countif(Severity =~ 'High' and Status in~ ('New', 'Active')),\n    ['Unassigned open'] = countif(isempty(tostring(Owner.userPrincipalName)) and Status in~ ('New', 'Active'))",
+        "size": 4,
+        "title": "Incident KPIs (latest state per incident)",
+        "visualization": "tiles",
+        "showMetrics": true,
+        "tileSettings": {
+          "showBorder": true,
+          "titleContent": { "columnMatch": "column", "formatter": 1 },
+          "leftContent": { "columnMatch": "value", "formatter": 12, "formatOptions": { "palette": "auto" } }
+        }
       },
       "name": "IncidentKPIs"
     },
@@ -50,9 +60,9 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "SecurityIncident\n| where TimeGenerated {TimeRange}\n| summarize Incidents = dcount(IncidentNumber) by Severity\n| order by Severity asc",
+        "query": "SecurityIncident\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by IncidentNumber\n| summarize Incidents = count() by Severity\n| order by Severity asc",
         "size": 3,
-        "title": "Incidents by severity",
+        "title": "Incidents by severity (latest state)",
         "visualization": "piechart"
       },
       "name": "IncidentsBySeverity"
@@ -63,7 +73,7 @@
         "version": "KqlItem/1.0",
         "query": "SecurityAlert\n| where TimeGenerated {TimeRange}\n| summarize Alerts = count() by AlertName\n| top 10 by Alerts desc",
         "size": 0,
-        "title": "Top 10 firing detections",
+        "title": "Top 10 firing detections (alert volume)",
         "visualization": "barchart"
       },
       "name": "TopDetections"
@@ -72,9 +82,9 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "SecurityAlert\n| where TimeGenerated {TimeRange}\n| summarize Alerts = count() by AlertName, bin(TimeGenerated, 1d)\n| render columnchart with (title=\"Alert volume per day (top 10 rules)\")",
+        "query": "// Daily volume split by severity. A spike in one severity band is a signal;\n// a uniform rise across bands usually means a new connector or a rule change.\nSecurityAlert\n| where TimeGenerated {TimeRange}\n| summarize Alerts = count() by bin(TimeGenerated, 1d), AlertSeverity\n| order by TimeGenerated asc",
         "size": 0,
-        "title": "Detection trend (daily)",
+        "title": "Detection trend — alert volume per day by severity",
         "visualization": "linechart"
       },
       "name": "DetectionTrend"
@@ -83,7 +93,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "SecurityAlert\n| where TimeGenerated {TimeRange}\n| mv-expand t = todynamic(Tactics)\n| summarize Alerts = count() by Tactic = tostring(t)\n| order by Alerts desc",
+        "query": "SecurityAlert\n| where TimeGenerated {TimeRange}\n| mv-expand Tactic = todynamic(Tactics)\n| extend Tactic = tostring(Tactic)\n| where isnotempty(Tactic)\n| summarize Alerts = count() by Tactic\n| order by Alerts desc",
         "size": 0,
         "title": "Alerts per MITRE ATT&CK tactic",
         "visualization": "barchart"
@@ -94,7 +104,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "SecurityAlert\n| where TimeGenerated {TimeRange}\n| extend Entities = parse_json(Entities)\n| mv-expand e = Entities\n| extend Type = tostring(e.Type), Value = coalesce(tostring(e.Name), tostring(e.Address), tostring(e.HostName))\n| where isnotempty(Value)\n| summarize Hits = count() by Type, Value\n| top 20 by Hits desc",
+        "query": "// Entities is a string column on SecurityAlert that carries a JSON array.\nSecurityAlert\n| where TimeGenerated {TimeRange}\n| extend Entities = parse_json(Entities)\n| mv-expand e = Entities\n| extend Type = tostring(e.Type)\n| extend Value = coalesce(tostring(e.Name), tostring(e.Address), tostring(e.HostName), tostring(e.UPNSuffix), tostring(e.FullName))\n| where isnotempty(Value)\n| summarize Hits = count() by Type, Value\n| top 20 by Hits desc",
         "size": 0,
         "title": "Top entities (accounts, hosts, IPs)",
         "visualization": "table"
@@ -105,7 +115,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "SecurityIncident\n| where TimeGenerated {TimeRange}\n| extend MTTA_min = datetime_diff('minute', FirstActivityTime, CreatedTime)\n| extend MTTR_min = datetime_diff('minute', ClosedTime, CreatedTime)\n| summarize MTTA = avg(MTTA_min), MTTR = avg(MTTR_min) by Severity",
+        "query": "// MTTA = first modification - creation. FirstModifiedTime is the platform's\n// first-touch timestamp; FirstActivityTime is when the *underlying event*\n// happened, which measures detection latency instead (see the latency panel).\n// MTTR is only defined for closed incidents, so it ignores null ClosedTime rows.\nSecurityIncident\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by IncidentNumber\n| extend MTTA_min = datetime_diff('minute', FirstModifiedTime, CreatedTime)\n| extend MTTR_min = iff(Status =~ 'Closed', datetime_diff('minute', ClosedTime, CreatedTime), int(null))\n| summarize\n    Incidents = count(),\n    ['MTTA avg (min)'] = round(avg(MTTA_min), 1),\n    ['MTTA p95 (min)'] = percentile(MTTA_min, 95),\n    ['MTTR avg (min)'] = round(avg(MTTR_min), 1),\n    ['MTTR p95 (min)'] = percentile(MTTR_min, 95)\n    by Severity\n| order by Severity asc",
         "size": 0,
         "title": "MTTA / MTTR by severity (minutes)",
         "visualization": "table"
@@ -116,9 +126,31 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "SecurityIncident\n| where TimeGenerated {TimeRange}\n| where Status =~ \"Closed\"\n| summarize Total = count(), ClosedAsFalsePositive = countif(CloseReason =~ \"FalsePositive\"), ClosedAsTruePositive = countif(CloseReason =~ \"TruePositive\"), ClosedAsSuspicious = countif(CloseReason =~ \"SuspiciousActivity\"), ClosedUndetermined = countif(CloseReason =~ \"Undetermined\") by Title\n| extend FalsePositiveRate = round(100.0 * ClosedAsFalsePositive / Total, 1)\n| where Total >= 5\n| top 10 by FalsePositiveRate desc",
+        "query": "// Detection latency: alert time minus the time the underlying event occurred.\n// This is a property of the rule schedule and ingestion pipeline, not of the\n// analyst — compare it against each rule's queryFrequency.\nSecurityAlert\n| where TimeGenerated {TimeRange}\n| extend LatencyMin = datetime_diff('minute', TimeGenerated, StartTime)\n| where LatencyMin >= 0\n| summarize\n    Alerts = count(),\n    ['p50 (min)'] = percentile(LatencyMin, 50),\n    ['p95 (min)'] = percentile(LatencyMin, 95),\n    ['max (min)'] = max(LatencyMin)\n    by AlertName\n| top 15 by Alerts desc",
         "size": 0,
-        "title": "Tuning indicators — rules with the highest benign-positive closure rate (≥ 5 closed incidents)",
+        "title": "Detection latency by rule (event time → alert time)",
+        "visualization": "table"
+      },
+      "name": "DetectionLatency"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "// Closure classification uses the Classification column, whose only values are\n// TruePositive, FalsePositive, BenignPositive and Undetermined. Undetermined is\n// kept separate on purpose: an untriaged incident is not a false positive.\nSecurityIncident\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by IncidentNumber\n| where Status =~ 'Closed'\n| extend Closure = iff(isempty(Classification), 'Unclassified', tostring(Classification))\n| summarize Incidents = count() by Closure\n| order by Incidents desc",
+        "size": 3,
+        "title": "Closed incidents by classification",
+        "visualization": "piechart"
+      },
+      "name": "ClosureClassification"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "// Tuning candidates: rules where more than 30% of closed incidents were marked\n// FalsePositive, on a sample of at least 5 closures. The 5-incident gate stops a\n// single noisy day from nominating a rule; both thresholds are the ones\n// documented in tests/validation/performance-metrics.md.\nlet min_closures = 5;\nlet fp_rate_trigger = 30.0;\nSecurityIncident\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by IncidentNumber\n| where Status =~ 'Closed'\n| summarize\n    Closed = count(),\n    FalsePositive = countif(Classification =~ 'FalsePositive'),\n    TruePositive = countif(Classification =~ 'TruePositive'),\n    BenignPositive = countif(Classification =~ 'BenignPositive')\n    by Title\n| where Closed >= min_closures\n| extend ['FP rate %'] = round(100.0 * FalsePositive / Closed, 1)\n| where ['FP rate %'] >= fp_rate_trigger\n| project Title, Closed, TruePositive, BenignPositive, FalsePositive, ['FP rate %']\n| order by ['FP rate %'] desc",
+        "size": 0,
+        "title": "Tuning candidates — rules with a false-positive rate of 30% or more (minimum 5 closures)",
         "visualization": "table"
       },
       "name": "TuningIndicators"
@@ -127,12 +159,41 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "SecurityIncident\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by IncidentNumber\n| where Status =~ \"New\" or Status =~ \"Active\"\n| project IncidentNumber, Title, Severity, Status, Owner=Owner.principalName, CreatedTime\n| order by CreatedTime desc",
+        "query": "// SLA breaches. Targets come from docs/workflows/escalation-matrix.md:\n// High acknowledged (first modified) within 5 minutes, Medium within 60.\n// Only open incidents can be in breach — closed ones are measured by MTTA above.\nlet high_target_min = 5;\nlet medium_target_min = 60;\nSecurityIncident\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by IncidentNumber\n| where Status in~ ('New', 'Active')\n| extend AgeMin = datetime_diff('minute', now(), CreatedTime)\n| extend AckMin = iff(isnotnull(FirstModifiedTime), datetime_diff('minute', FirstModifiedTime, CreatedTime), int(null))\n| extend TargetMin = case(\n      Severity =~ 'High', high_target_min,\n      Severity =~ 'Medium', medium_target_min,\n      int(null))\n| where isnotnull(TargetMin)\n| extend ['Unacknowledged past target'] = isnull(AckMin) and AgeMin > TargetMin\n| extend ['Acknowledged late'] = isnotnull(AckMin) and AckMin > TargetMin\n| where ['Unacknowledged past target'] or ['Acknowledged late']\n| project IncidentNumber, Title, Severity, Status,\n          Owner = tostring(Owner.userPrincipalName),\n          ['Age (min)'] = AgeMin, ['Ack (min)'] = AckMin, ['Target (min)'] = TargetMin,\n          CreatedTime\n| order by ['Age (min)'] desc",
+        "size": 0,
+        "title": "SLA breaches in the open queue (High > 5 min, Medium > 60 min)",
+        "visualization": "table"
+      },
+      "name": "SLABreaches"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "// Telemetry freshness. `union isfuzzy=true` means a table from a connector you\n// have not enabled yet contributes nothing instead of failing the whole panel —\n// so this tile is safe to read on a partially deployed workspace, where the\n// missing sources simply have no row. A source whose last event is hours old is\n// an ingestion problem the detections depend on, not an analyst problem.\nunion isfuzzy=true withsource=SourceTable\n    (SigninLogs | project TimeGenerated),\n    (AuditLogs | project TimeGenerated),\n    (OfficeActivity | project TimeGenerated),\n    (AzureActivity | project TimeGenerated),\n    (DeviceProcessEvents | project TimeGenerated),\n    (DeviceNetworkEvents | project TimeGenerated),\n    (DeviceFileEvents | project TimeGenerated),\n    (AzureDiagnostics | project TimeGenerated)\n| summarize\n    ['Last event (UTC)'] = max(TimeGenerated),\n    ['Events in range'] = count(),\n    ['Age (hours)'] = round(datetime_diff('minute', now(), max(TimeGenerated)) / 60.0, 1)\n    by SourceTable\n| order by ['Age (hours)'] asc",
+        "size": 0,
+        "title": "Telemetry freshness by source (safe on partially deployed workspaces)",
+        "visualization": "table"
+      },
+      "name": "TelemetryFreshness"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "// Owner is a dynamic object: userPrincipalName / email / assignedTo / objectId.\n// Owner.principalName does not exist and yields a blank column.\nSecurityIncident\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by IncidentNumber\n| where Status in~ ('New', 'Active')\n| extend Owner = tostring(Owner.userPrincipalName)\n| project IncidentNumber, Title, Severity, Status, Owner, CreatedTime,\n          ['Age (min)'] = datetime_diff('minute', now(), CreatedTime)\n| order by CreatedTime desc",
         "size": 0,
         "title": "Open incidents (latest state)",
         "visualization": "table"
       },
       "name": "OpenIncidents"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n\n### Reading this dashboard\n\n| Panel | What it answers |\n|---|---|\n| Incident KPIs | Is the queue growing, and is anything sitting unassigned? |\n| Incidents by severity | Where the analyst time is going |\n| Top firing detections | Which rules drive volume (cross-check against `expectedVolume` in the rule metadata) |\n| Detection trend | A step change in one severity band is usually a rule or connector change |\n| Alerts per tactic | Whether the estate is being probed in one ATT&CK phase |\n| Top entities | Repeat-offender accounts, hosts and IPs |\n| MTTA / MTTR | Triage and resolution performance against the escalation matrix |\n| Detection latency | Whether a rule is meeting its own `queryFrequency` promise |\n| Closure classification | Analyst agreement with the alerts — the input to tuning |\n| Tuning candidates | Rules to work through the tuning loop |\n| SLA breaches | Incidents that missed their acknowledgement target |\n| Telemetry freshness | Whether the connectors the detections depend on are still feeding |\n\nThe tuning thresholds on this page (5 closed incidents, 30% FP rate) are the same ones documented in\n[`tests/validation/performance-metrics.md`](https://github.com/sandeepmothukuri/sentinel-detection-engine/blob/main/tests/validation/performance-metrics.md)\nand in the tuning loop in [`docs/tuning.md`](https://github.com/sandeepmothukuri/sentinel-detection-engine/blob/main/docs/tuning.md).\nChanging one without the other is a documentation defect."
+      },
+      "name": "Footer"
     }
   ],
   "fallbackResourceIds": [],

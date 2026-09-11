@@ -71,7 +71,7 @@ Then Sentinel → **Data connectors** → for each, click **Open connector page*
 1. Push this repo to **your** GitHub account: `https://github.com/sandeepmothukuri/sentinel-detection-engine`
 2. Sentinel → **Repositories** → **Add new** → GitHub → authorise → select the repo
 3. Branch: `main` → Save
-4. Sentinel pulls the YAML files; within ~5 min you should see all 12 analytic rules + 10 hunting queries + 1 workbook in the portal
+4. Sentinel pulls the YAML files; within ~5 min you should see all 18 analytic rules + 10 hunting queries + 1 workbook in the portal
 
 ## Step 7 — Validate one detection end-to-end
 
@@ -94,7 +94,10 @@ With incidents actually firing on your tenant, capture screenshots of:
 - Sentinel → Workbooks → L3 Triage Dashboard (loaded with real data)
 - ATT&CK Navigator with `attack-navigator/layer.json` loaded
 
-Drop them into `docs/images/` and reference them from the README.
+File them under the matching `docs/images/<area>/` directory with a descriptive name, register each
+one in [`evidence.md`](evidence.md) with its environment, date and redaction list, and reference it
+from the README. Nothing lands in `docs/images/` without a register entry — that register is what
+makes a screenshot trustworthy rather than decorative.
 
 ## Tear-down
 

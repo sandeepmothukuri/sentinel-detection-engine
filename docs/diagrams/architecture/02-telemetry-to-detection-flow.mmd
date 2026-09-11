@@ -1,0 +1,18 @@
+---
+title: From raw event to analyst decision
+---
+flowchart LR
+  A["Source event<br/>sign-in, process, file, audit"] --> B["Connector<br/>normalises into a Log Analytics table"]
+  B --> C["Analytics rule<br/>runs every queryFrequency<br/>looks back queryPeriod"]
+  C --> D{"Query returns rows<br/>above threshold?"}
+  D -->|no| E["No alert<br/>rule stays silent"]
+  D -->|yes| F["Alert is created<br/>entities mapped from the result row<br/>display name rendered from columns"]
+  F --> G["Incident grouping<br/>by entity, within lookbackDuration"]
+  G --> H["Analyst triage<br/>L3 workbook, triage SOP"]
+  H --> I{"Confidence and<br/>impact confirmed?"}
+  I -->|no| J["Close with classification<br/>FalsePositive or BenignPositive<br/>tuning log entry if repeated"]
+  I -->|yes| K["SOAR playbook<br/>behind a confidence threshold"]
+  K --> L["Containment action<br/>disable user, isolate device, block IP"]
+  L --> M["Verification and audit<br/>action result, rollback path recorded"]
+  J --> N["Tuning loop<br/>threshold, exclusion, watchlist, retirement"]
+  N --> C

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-entraidserviceprincipalcredadd-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a04",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'Entra ID - Service Principal Credential Added'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-entraidserviceprincipalcredadd-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "Entra ID - Service Principal Credential Added",
+        "description": "Detects \"Update application - Certificates and secrets management\" or\n\"Add service principal credentials\" operations. SP credential additions are\na known persistence mechanism (Midnight Blizzard / NOBELIUM TTP) — once an\nattacker has Application Admin rights they add a new client secret to a\nlegitimate enterprise app and use it as a persistent backdoor that survives\npassword resets.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "let excluded_actors = dynamic([]);\nAuditLogs\n| where TimeGenerated > ago(1h)\n| where OperationName in (\n    \"Update application - Certificates and secrets management\",\n    \"Update application – Certificates and secrets management\",\n    \"Update service principal - Certificates and secrets management\",\n    \"Update service principal – Certificates and secrets management\",\n    \"Add service principal credentials\"\n  )\n| extend Actor = tostring(InitiatedBy.user.userPrincipalName)\n| extend ActorApp = tostring(InitiatedBy.app.displayName)\n| extend TargetApp = tostring(TargetResources[0].displayName)\n| extend TargetId = tostring(TargetResources[0].id)\n| where Actor !in (excluded_actors)\n| project TimeGenerated, OperationName, Actor, ActorApp, TargetApp, TargetId,\n          Result, AdditionalDetails\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "Persistence",
+          "PrivilegeEscalation"
+        ],
+        "techniques": [
+          "T1098.001"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "FullName",
+                "columnName": "Actor"
+              }
+            ]
+          },
+          {
+            "entityType": "CloudApplication",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "TargetApp"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT1H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Account"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "Credential added to {{TargetApp}} by {{Actor}}",
+          "alertDescriptionFormat": "{{Actor}} performed {{OperationName}} against {{TargetApp}}. Confirm the actor is human or expected automation before revoking the new credential."
+        }
+      }
+    }
+  ]
+}

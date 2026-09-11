@@ -1,0 +1,13 @@
+flowchart LR
+  H["1 · Hypothesis<br/>behaviour worth detecting"] --> T["2 · Telemetry check<br/>table and connector health"]
+  T --> Q["3 · Query<br/>ago-bounded, returns TimeGenerated"]
+  Q --> V["4 · Static validation<br/>schema · ATT&amp;CK · entities · KQL lint"]
+  V --> L["5 · Validation ledger<br/>trigger atomic or manual procedure"]
+  L --> PR["6 · Pull request<br/>CI must pass, version bumped"]
+  PR --> DEP["7 · Deploy<br/>GitOps or portal import"]
+  DEP --> M["8 · Measure<br/>volume · precision · latency"]
+  M --> Q2{"Noisy or silent?"}
+  Q2 -->|"noisy"| TUNE["9 · Tune<br/>threshold or watchlist exclusion"]
+  Q2 -->|"silent"| DBG["9 · Diagnose<br/>connector, volume, schema drift"]
+  TUNE --> Q
+  DBG --> Q

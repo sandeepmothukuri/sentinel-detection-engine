@@ -16,9 +16,15 @@ cannot guarantee is semantically correct.
 Not a full pySigma replacement. Known limitations (by design):
   - Only the four logsource categories in TABLE_MAP; everything else fails loudly.
   - Sigma modifiers supported: |contains, |startswith, |endswith, |re, and lists.
+    Multi-value |endswith / |startswith expand to an explicit OR of per-element
+    predicates, because KQL has no set form and has_any() would change the
+    semantics from prefix/suffix to substring matching.
     Other modifiers (|base64offset, |endswithfield, |gt, |exists, ...) are
     treated as plain field names and will usually produce wrong KQL — check
     the output before use.
+  - The `Hashes` field maps to SHA256, but Sigma expresses Hashes as a list of
+    "ALGO=value" strings, so an exact-match `=~` against SHA256 will not match.
+    Rewrite hash conditions by hand.
   - Field-value wildcards (|\\mimikatz.exe) become endswith/has matches, not
     true glob matching.
   - No timeframe handling, no aggregation conditions (count() by ...), no
@@ -98,11 +104,23 @@ def _render_value(field: str, value, table_fields: dict[str, str]) -> str:
     quoted = [f'"{str(v)}"' for v in values]
     if op_re:
         return f"{kql_field} matches regex {quoted[0]}"
+    # KQL has no set form of endswith/startswith: `endswith_cs any (...)` is not
+    # valid syntax and scripts/kql_lint.py rejects it. For multiple values the
+    # equivalent is an explicit OR of per-element predicates. has_any() is *not*
+    # a substitute — it is term-based and order-insensitive, so it would silently
+    # widen a prefix/suffix match into a substring match.
     if op_endswith:
-        return f"{kql_field} endswith_cs any ({', '.join(quoted)})" if len(quoted) > 1 else f"{kql_field} endswith {quoted[0]}"
+        if len(quoted) == 1:
+            return f"{kql_field} endswith_cs {quoted[0]}"
+        return " or ".join(f"{kql_field} endswith_cs {q}" for q in quoted)
     if op_startswith:
-        return f"{kql_field} startswith {quoted[0]}" if len(quoted) == 1 else f"{kql_field} has_any ({', '.join(quoted)})"
+        if len(quoted) == 1:
+            return f"{kql_field} startswith_cs {quoted[0]}"
+        return " or ".join(f"{kql_field} startswith_cs {q}" for q in quoted)
     if op_contains:
+        # has_any is case-insensitive and term-based, which matches Sigma's
+        # case-insensitive substring intent closely enough for single tokens;
+        # multi-word literals keep has_any's term-sequence semantics.
         return f"{kql_field} has_any ({', '.join(quoted)})"
     if len(quoted) > 1:
         return f"{kql_field} in~ ({', '.join(quoted)})"
@@ -111,7 +129,10 @@ def _render_value(field: str, value, table_fields: dict[str, str]) -> str:
 
 def _render_block(block: dict, table_fields: dict[str, str]) -> str:
     parts = [_render_value(k, v, table_fields) for k, v in block.items()]
-    return " and ".join(parts)
+    # A multi-value endswith/startswith renders as an OR chain, which must be
+    # bracketed before it is ANDed with the rest of the selection.
+    wrapped = [f"({p})" if " or " in p else p for p in parts]
+    return " and ".join(wrapped)
 
 
 def _resolve_condition(condition: str, rendered: dict[str, str]) -> str:

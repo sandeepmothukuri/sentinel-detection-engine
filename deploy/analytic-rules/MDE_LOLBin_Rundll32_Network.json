@@ -1,0 +1,109 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name that Microsoft Sentinel is enabled on"
+      }
+    },
+    "analytic-mdelolbinrundll32network-id": {
+      "type": "string",
+      "defaultValue": "8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a08",
+      "minLength": 1,
+      "metadata": {
+        "description": "Resource name of the analytics rule 'MDE - rundll32 With External Network Connection'"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "apiVersion": "2020-01-01",
+      "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/', parameters('analytic-mdelolbinrundll32network-id'))]",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "displayName": "MDE - rundll32 With External Network Connection",
+        "description": "Detects rundll32.exe processes making outbound network connections to non-RFC1918\ndestinations. Legitimate rundll32 should rarely contact the internet directly;\nthis pattern is a hallmark of CobaltStrike, IcedID, and Qakbot loaders.\n",
+        "severity": "High",
+        "enabled": true,
+        "query": "// Loader families that abuse rundll32 for C2 overwhelmingly use these ports.\n// Restricting to them keeps volume manageable; widen deliberately and watch the\n// alert count (see tuningGuidance).\nlet suspicious_ports = dynamic([80, 443, 8080, 8443, 53]);\nlet proc =\n  DeviceProcessEvents\n  | where TimeGenerated > ago(1h)\n  | where FileName =~ \"rundll32.exe\"\n  | project ProcTime = TimeGenerated, DeviceId, DeviceName, ProcessId,\n            InitiatingProcessFileName, ProcessCommandLine, AccountName;\nlet net =\n  DeviceNetworkEvents\n  | where TimeGenerated > ago(1h)\n  | where InitiatingProcessFileName =~ \"rundll32.exe\"\n  | where RemoteIPType !in (\"Private\",\"Loopback\",\"LinkLocal\",\"Reserved\")\n  | where isnotempty(RemoteIP)\n  // RemotePort is dynamic in DeviceNetworkEvents; cast before the set membership\n  // test so the filter behaves predictably across connector schemas.\n  | where toint(RemotePort) in (suspicious_ports)\n  | project NetTime = TimeGenerated, DeviceId, InitiatingProcessId,\n            RemoteIP, RemotePort, RemoteUrl;\nproc\n| join kind=inner net on DeviceId, $left.ProcessId == $right.InitiatingProcessId\n| where NetTime between (ProcTime .. (ProcTime + 10m))\n| project TimeGenerated = NetTime, ProcTime, DeviceId, DeviceName, AccountName, ProcessCommandLine,\n          RemoteIP, RemotePort, RemoteUrl, InitiatingProcessFileName\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "suppressionEnabled": false,
+        "suppressionDuration": "PT1H",
+        "tactics": [
+          "DefenseEvasion",
+          "Execution",
+          "CommandAndControl"
+        ],
+        "techniques": [
+          "T1218.011",
+          "T1071.001"
+        ],
+        "entityMappings": [
+          {
+            "entityType": "Host",
+            "fieldMappings": [
+              {
+                "identifier": "HostName",
+                "columnName": "DeviceName"
+              }
+            ]
+          },
+          {
+            "entityType": "Account",
+            "fieldMappings": [
+              {
+                "identifier": "Name",
+                "columnName": "AccountName"
+              }
+            ]
+          },
+          {
+            "entityType": "IP",
+            "fieldMappings": [
+              {
+                "identifier": "Address",
+                "columnName": "RemoteIP"
+              }
+            ]
+          },
+          {
+            "entityType": "Process",
+            "fieldMappings": [
+              {
+                "identifier": "CommandLine",
+                "columnName": "ProcessCommandLine"
+              }
+            ]
+          }
+        ],
+        "incidentConfiguration": {
+          "createIncident": true,
+          "groupingConfiguration": {
+            "enabled": true,
+            "reopenClosedIncident": false,
+            "lookbackDuration": "PT12H",
+            "matchingMethod": "Selected",
+            "groupByEntities": [
+              "Host"
+            ]
+          }
+        },
+        "eventGroupingSettings": {
+          "aggregationKind": "SingleAlert"
+        },
+        "alertDetailsOverride": {
+          "alertDisplayNameFormat": "rundll32 network call from {{DeviceName}}",
+          "alertDescriptionFormat": "rundll32.exe on {{DeviceName}} connected to {{RemoteIP}} after launching with the command line recorded in this alert."
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+# Validation ledger schema.
+#
+# The ledger (tests/validation/atomics.yaml) records, per rule, what has actually
+# been tested. scripts/ci_validate.py enforces the rules below; anything not
+# enforced by the validator is enforced by review, and says so.
+$schema: "sentinel-detection-engine/validation-ledger/1.0"
+schema_version: "1.0"
+last_reviewed: "2026-09-11"
+
+# ---------------------------------------------------------------------------
+# Document shape
+# ---------------------------------------------------------------------------
+document:
+  required_keys:
+    - schema_version      # string, matches this file's schema_version
+    - last_reviewed       # ISO date, when a human last read the whole ledger
+    - source              # provenance of the atomic definitions
+    - rules               # list of rule entries
+  optional_keys:
+    - notes
+
+rule_entry:
+  required_keys:
+    - rule                # rule file stem, must match Detections/*.yaml or Hunting Queries/*.yaml
+    - status              # one value from `validation_status` below
+    - evidence            # free text: what backs the recorded status
+    - checks              # list, may be empty only when manual_procedure is present
+  optional_keys:
+    - manual_procedure    # free text steps a human performs
+    - notes               # free text: caveats, why an obvious atomic is not cited
+
+check_entry:
+  required_keys:
+    - technique           # ATT&CK technique id, must be declared by the rule
+    - role                # one of `roles` below
+  optional_keys:
+    - atomic              # 1-based index into the upstream Atomic Red Team file for `technique`
+    - note                # free text; required when role is `partial`
+
+# ---------------------------------------------------------------------------
+# Closed vocabularies
+# ---------------------------------------------------------------------------
+# A rule is never "tested" in the abstract. It is in exactly one of these states,
+# and the validator refuses any other word.
+validation_status:
+  STATIC VALIDATION:
+    meaning: >-
+      The rule passes schema, KQL lint, ATT&CK coherence, telemetry-to-connector
+      parity and metadata checks in CI. Nothing has been executed.
+    requires:
+      - "checks may be empty if a manual procedure is documented"
+      - "evidence must name the CI gate, not a tenant"
+  SIMULATED:
+    meaning: >-
+      The detection logic has been exercised against deliberately produced
+      telemetry outside a production tenant — a lab workspace, a replay of
+      captured events, or a table seeded with synthetic rows shaped exactly like
+      the real source.
+    requires:
+      - "a dated evidence record (tests/validation/evidence/)"
+      - "the environment named, and whether the data was synthetic, replayed or live-lab"
+  VALIDATED IN LIVE TENANT:
+    meaning: >-
+      The rule fired on real telemetry in a tenant that the author administers or
+      is authorised to test in, and the resulting incident was reviewed by a
+      human.
+    requires:
+      - "a dated evidence record (tests/validation/evidence/)"
+      - "an incident reference"
+      - "the tuning outcome, or an explicit statement that no tuning was needed"
+  NOT YET VALIDATED:
+    meaning: >-
+      The rule is in the repository but has not been through static validation or
+      any execution. A rule in this state is a draft, not a detection.
+    requires:
+      - "the reason the rule is in the repository"
+
+# ---------------------------------------------------------------------------
+# Atomic check roles
+# ---------------------------------------------------------------------------
+roles:
+  trigger: "Executing this atomic should make the rule fire. This is the only role that supports a claim that a rule detects a technique."
+  precondition: "Setup the trigger depends on (enables a service, creates a user). Never counted as evidence of detection."
+  partial: "Exercises part of the detection predicate. Must carry a note stating precisely what it does not cover."
+
+# ---------------------------------------------------------------------------
+# Evidence requirements
+# ---------------------------------------------------------------------------
+evidence_requirements:
+  file_location: "tests/validation/evidence/<RULE-STEM>-<YYYY-MM-DD>.md"
+  template: "tests/validation/evidence-template.md"
+  must_state:
+    - "rule name and rule version as committed"
+    - "workspace / environment, with identifiers redacted"
+    - "connectors confirmed connected, not merely enabled"
+    - "what was executed: the atomic id or the manual procedure actually performed"
+    - "the raw confirmation query and its result, not a paraphrase"
+    - "interpretation: what the result proves, and what it does not"
+    - "sign-off: name and date"
+  forbidden:
+    - "incident numbers that were not produced by a real incident"
+    - "execution results the author did not observe"
+    - "an evidence file written after the fact from memory"
+
+# ---------------------------------------------------------------------------
+# Mappings that are explicitly rejected by this repository
+# ---------------------------------------------------------------------------
+# These were considered and refused. Keeping the refusals written down stops the
+# same wrong mapping from being re-introduced, and documents the reasoning.
+rejected_mappings:
+  - id: T1528-oauth-consent
+    would_map: "M365_OAuthConsentSuspiciousApp"
+    reason: >-
+      T1528's upstream atomics steal Azure Functions identity tokens. They do not
+      produce an OAuth consent-grant audit event, so citing them would claim a
+      validation that never happened.
+  - id: T1114.003-inbox-rule-vs-mailbox-forwarding
+    would_map: "HUN_AnomalousMailboxForwarding"
+    reason: >-
+      T1114.003-1 uses New-InboxRule -ForwardTo, an inbox rule. The hunt detects
+      mailbox-level forwarding addresses. The atomic validates the inbox-rule rule,
+      not the forwarding hunt.
+  - id: T1486-akira-vs-mass-rename
+    would_map: "MDE_Ransomware_MassFileRename"
+    reason: >-
+      T1486-10 writes new .akira files and never renames. The rule counts
+      FileRenamed events, so the atomic cannot fire it. It is recorded as partial.
+  - id: T1090.003-tor-vs-datacenter-asn-signin
+    would_map: "HUN_SignInFromDatacenterASN"
+    reason: >-
+      Tor and Psiphon atomics run on an endpoint and produce network telemetry.
+      The hunt reads Entra ID sign-in logs, where an autonomouse system number is
+      a property of the sign-in, not of the host.
+  - id: T1021.004-esxi-ssh-vs-client-ssh
+    would_map: "HUN_NewSSHConnectionFromInternal"
+    reason: >-
+      T1021.004's atomics enable SSH on an ESXi host. They do not create a client
+      SSH session, which is what the hunt sees in device network telemetry.
+
+# ---------------------------------------------------------------------------
+# What the validator does not check
+# ---------------------------------------------------------------------------
+# Stated plainly so nobody mistakes a green build for a working detection.
+validator_limitations:
+  - "It cannot confirm that a query is logically correct for the behaviour it claims to detect."
+  - "It cannot detect a KQL expression that is syntactically valid and semantically wrong, such as reading a lower-case JSON key."
+  - "It cannot confirm that a connector is actually receiving data."
+  - "It cannot confirm that an atomic fired, only that the atomic exists and the ledger points at it."
+  - "It says nothing about false-positive rate, which requires closed incidents."

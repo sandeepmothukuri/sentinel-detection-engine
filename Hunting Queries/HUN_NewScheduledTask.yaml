@@ -50,3 +50,7 @@ limitations: |
   but tasks created on non-MDE devices are invisible. 24h window = manual hunt
   cadence, not continuous coverage.
 version: 1.1.0
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.yaml

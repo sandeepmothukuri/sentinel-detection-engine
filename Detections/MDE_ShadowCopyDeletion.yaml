@@ -1,0 +1,106 @@
+id: 8a9d3f0c-1b2e-4d6a-9c11-7f4e0c2b8a0d
+name: MDE - Shadow Copy / Recovery Inhibited
+description: |
+  Detects command lines that delete volume shadow copies, delete the backup
+  catalog, or disable Windows recovery. This is the pre-encryption step of
+  virtually every ransomware affiliate playbook (Conti/LockBit/Black Basta/
+  Akira lineage): destroy the recovery path first so the victim cannot restore
+  without paying. Taken alone it is extremely high-signal — legitimate
+  administrators do not typically run `vssadmin delete shadows /all` on
+  workstations.
+severity: High
+status: Available
+kind: Scheduled
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Impact
+relevantTechniques:
+  - T1490
+query: |
+  // Interpreters and utilities that legitimately own shadow-copy management.
+  let recovery_tools = dynamic([
+    "vssadmin.exe", "wmic.exe", "wbadmin.exe", "bcdedit.exe",
+    "powershell.exe", "pwsh.exe", "diskshadow.exe", "cmd.exe"
+  ]);
+  // Term pairs are evaluated with has_any, which matches whole terms; keep each
+  // entry as a phrase an attacker would actually type.
+  let destruction_terms = dynamic([
+    "delete shadows",
+    "shadowcopy delete",
+    "delete catalog",
+    "delete systemstatebackup",
+    "recoveryenabled no",
+    "bootstatuspolicy ignoreallfailures",
+    "win32_shadowcopy",
+    "resize shadowstorage",
+    "delete shadows /all /quiet"
+  ]);
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where FileName in~ (recovery_tools)
+  | where ProcessCommandLine has_any (destruction_terms)
+  | project TimeGenerated, DeviceId, DeviceName, AccountName, FileName,
+            ProcessCommandLine, FolderPath, SHA256,
+            InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+  - entityType: Process
+    fieldMappings:
+      - identifier: CommandLine
+        columnName: ProcessCommandLine
+incidentConfiguration:
+  createIncident: true
+  groupingConfiguration:
+    enabled: true
+    reopenClosedIncident: false
+    lookbackDuration: PT12H
+    matchingMethod: Selected
+    groupByEntities:
+      - Host
+eventGroupingSettings:
+  aggregationKind: SingleAlert
+alertDetailsOverride:
+  alertDisplayNameFormat: Shadow copy or recovery deletion on {{DeviceName}}
+  alertDescriptionFormat: >-
+    {{FileName}} on {{DeviceName}} was invoked with a command line that deletes
+    shadow copies, the backup catalog, or Windows recovery: {{ProcessCommandLine}}
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.md
+  telemetryDependency: DeviceProcessEvents (Microsoft Defender for Endpoint / M365 advanced hunting) with command-line capture enabled. No ScriptBlockLogging requirement — the destructive command line is captured at process creation.
+  falsePositives: |
+    - Backup products that prune shadow storage as part of a documented schedule
+      (Veeam, Backup Exec, DPM agents) — these normally show a vendor-signed
+      InitiatingProcessFileName and a stable cadence.
+    - Storage-administration scripts that resize shadow storage during capacity
+      work; those use "resize shadowstorage" and nothing else from the term list.
+    - Golden-image or re-imaging pipelines that disable recovery before capture.
+  tuningGuidance: |
+    - Remove "resize shadowstorage" from destruction_terms if capacity tooling is
+      noisy: it is the least destructive term in the list and the only one that
+      appears in routine storage administration.
+    - If a signed backup product generates incidents, filter on
+      InitiatingProcessFileName before widening the term list — do not suppress
+      the whole rule, because the same term list is the ransomware tripwire.
+    - Escalation is immediate: pair this rule with the escalation matrix entry for
+      ransomware indicators rather than treating it as a routine High.
+  suppression: |
+    No static suppression. Vendor-tool allow-listing by InitiatingProcessFileName
+    is the supported tuning path; every entry needs an owner and a change record.
+  expectedVolume: Very low. Near zero on a well-managed estate outside backup maintenance windows.
+version: 1.0.0

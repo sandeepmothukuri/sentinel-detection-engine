@@ -1,7 +1,7 @@
 {
   "name": "sentinel-detection-engine coverage",
   "versions": {
-    "attack": "18",
+    "attack": "19",
     "navigator": "5.1.0",
     "layer": "4.5"
   },
@@ -16,10 +16,24 @@
       "enabled": true
     },
     {
+      "techniqueID": "T1021.002",
+      "score": 25,
+      "color": "",
+      "comment": "MDE - PsExec-Style Service Execution (Detection)",
+      "enabled": true
+    },
+    {
       "techniqueID": "T1021.004",
       "score": 25,
       "color": "",
       "comment": "HUN - Lateral SSH/RDP From Workstation (Hunt)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1021.006",
+      "score": 25,
+      "color": "",
+      "comment": "MDE - WinRM Remote Command Execution (Detection)",
       "enabled": true
     },
     {
@@ -86,17 +100,24 @@
       "enabled": true
     },
     {
+      "techniqueID": "T1098",
+      "score": 25,
+      "color": "",
+      "comment": "Azure - Key Vault Access Policy or Network ACL Modified (Detection)",
+      "enabled": true
+    },
+    {
       "techniqueID": "T1098.001",
       "score": 50,
       "color": "",
-      "comment": "Entra ID - Service Principal Credential Added (Detection); M365 - Suspicious OAuth Consent to Unverified Publisher (Detection)",
+      "comment": "Entra ID - Service Principal Credential Added (Detection); M365 - OAuth Consent to High-Risk Scopes (Detection)",
       "enabled": true
     },
     {
       "techniqueID": "T1098.003",
-      "score": 25,
+      "score": 50,
       "color": "",
-      "comment": "HUN - Guest User Added To Privileged Role / Group (Hunt)",
+      "comment": "Entra ID - Privileged Role Granted to User or Service Principal (Detection); HUN - Guest User Added To Privileged Role / Group (Hunt)",
       "enabled": true
     },
     {
@@ -163,10 +184,24 @@
       "enabled": true
     },
     {
+      "techniqueID": "T1486",
+      "score": 25,
+      "color": "",
+      "comment": "MDE - Ransomware-Style Mass File Rename Per Device (Detection)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1490",
+      "score": 25,
+      "color": "",
+      "comment": "MDE - Shadow Copy / Recovery Inhibited (Detection)",
+      "enabled": true
+    },
+    {
       "techniqueID": "T1528",
       "score": 25,
       "color": "",
-      "comment": "M365 - Suspicious OAuth Consent to Unverified Publisher (Detection)",
+      "comment": "M365 - OAuth Consent to High-Risk Scopes (Detection)",
       "enabled": true
     },
     {
@@ -212,6 +247,13 @@
       "enabled": true
     },
     {
+      "techniqueID": "T1569.002",
+      "score": 25,
+      "color": "",
+      "comment": "MDE - PsExec-Style Service Execution (Detection)",
+      "enabled": true
+    },
+    {
       "techniqueID": "T1621",
       "score": 25,
       "color": "",
@@ -220,9 +262,9 @@
     },
     {
       "techniqueID": "T1686.001",
-      "score": 25,
+      "score": 50,
       "color": "",
-      "comment": "Azure - NSG Rule Opens Port to 0.0.0.0/0 (Detection)",
+      "comment": "Azure - Key Vault Access Policy or Network ACL Modified (Detection); Azure - NSG Rule Opens Port to 0.0.0.0/0 (Detection)",
       "enabled": true
     }
   ],

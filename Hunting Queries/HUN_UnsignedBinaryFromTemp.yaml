@@ -54,3 +54,7 @@ limitations: |
   relying on it. Installs-by-design (per-user installers) are permanent noise
   and need process-name allow-listing.
 version: 1.1.0
+metadata:
+  author: Sandeep Mothukuri
+  validationStatus: static-validation
+  testMapping: tests/atomics.yaml

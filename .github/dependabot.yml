@@ -1,0 +1,30 @@
+# Actions in this repository are pinned to immutable commit SHAs, which is the
+# correct default but also means they stop moving on their own. Dependabot is the
+# mechanism that keeps those pins current, so pinning and this file belong
+# together: without it, pinned actions silently age.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "build"
+    # The validation pipeline depends on exactly these packages. A major bump can
+    # change lint output and fail CI, so major versions are reviewed by hand.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
