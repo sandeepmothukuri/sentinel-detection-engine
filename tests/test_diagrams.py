@@ -195,7 +195,7 @@ def test_the_social_card_states_the_same_numbers_as_the_rule_files():
     preview image that contradicts them is worse than no preview image."""
     manifest = json.loads((REPO / "docs" / "images" / "generated-charts.json").read_text(
         encoding="utf-8"))["images"]
-    card = manifest["social/preview-card.png"]["data"]
+    card = manifest["social/01-social-preview-card.png"]["data"]
     rules = len(list((REPO / "Detections").glob("*.yaml")))
     hunts = len(list((REPO / "Hunting Queries").glob("*.yaml")))
     layer = json.loads((REPO / "attack-navigator" / "layer.json").read_text(encoding="utf-8"))
@@ -245,3 +245,19 @@ def test_the_coverage_chart_states_the_numbers_the_documents_state():
     assert not (drawn_as_empty & rule_tactics), (
         "the chart draws these tactics as having no coverage while rules declare them: "
         f"{sorted(drawn_as_empty & rule_tactics)}")
+
+
+def test_the_gallery_shows_every_image_exactly_once():
+    """docs/images/gallery.md is the page a reader lands on, so it has to be the
+    complete set: not a selection, and not a list with an image the repository does
+    not have. Both directions are checked against the disk."""
+    gallery = (REPO / "docs" / "images" / "gallery.md").read_text(encoding="utf-8")
+    committed = sorted(p.relative_to(REPO / "docs" / "images").as_posix()
+                       for p in (REPO / "docs" / "images").rglob("*.png"))
+    linked = re.findall(r"^!\[[^\]]*\]\(([^)]+\.png)\)$", gallery, re.MULTILINE)
+    assert sorted(linked) == committed, (
+        "docs/images/gallery.md does not show exactly the committed images.\n"
+        f"  missing from the gallery: {sorted(set(committed) - set(linked))}\n"
+        f"  listed but not committed: {sorted(set(linked) - set(committed))}\n"
+        f"  duplicated in the gallery: "
+        f"{sorted({x for x in linked if linked.count(x) > 1})}")

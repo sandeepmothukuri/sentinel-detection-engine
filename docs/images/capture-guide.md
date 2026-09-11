@@ -10,7 +10,7 @@ register entry. [`capture-manifest.yaml`](capture-manifest.yaml) is the machine-
 the list, and [`../evidence.md`](../evidence.md) is where a filed capture lands.
 
 **Current state: 1 of 10 shots is filed.** The ATT&CK Navigator export at
-[`attack/03-attack-navigator-export.png`](attack/03-attack-navigator-export.png) is a real capture of a
+[`attack/02-navigator-export.png`](attack/02-navigator-export.png) is a real capture of a
 real tool. The other nine are pending, and they are the reason every validation status in this
 repository reads `STATIC VALIDATION` rather than anything stronger. A repository cannot capture a
 tenant it does not have. It can, however, make the ten minutes that capture takes as small as possible

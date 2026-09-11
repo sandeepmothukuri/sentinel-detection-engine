@@ -253,7 +253,7 @@ secrets. The script removes what is attached to the file, not what is on the scr
   exist has no place in an evidence register. The replacement above is generated from the
   workbook definition and contains no numbers at all.
 
-### `workbooks/02-dashboard-sample-data-illustration.png`
+### `workbooks/02-triage-dashboard-sample-data.png`
 - **Provenance class:** Design preview (illustrative sample data)
 - **Source:** Static render of the panel layout defined in `Workbooks/L3-Triage-Dashboard.json`,
   filed from the author's workstation on 2026-09-11 and re-encoded on intake to strip file metadata.
@@ -288,7 +288,7 @@ into this directory, and the number was left as a gap rather than reused, so tha
 path fails loudly instead of silently resolving to a different image. Numbering for images added
 later starts at `04` for the same reason.*
 
-### `attack/01-attack-coverage-by-tactic.png`
+### `attack/01-coverage-by-tactic.png`
 - **Provenance class:** Generated chart
 - **Source:** `scripts/render_coverage_chart.py`, reading `attack-navigator/layer.json`,
   `scripts/attack_data.json` and the 28 rule files.
@@ -299,7 +299,7 @@ later starts at `04` for the same reason.*
   number (techniques, tactics covered) is the same number stated in `coverage.md`.
 - **Redactions:** None required.
 
-### `attack/03-attack-navigator-export.png`
+### `attack/02-navigator-export.png`
 - **Provenance class:** Screenshot
 - **Source:** MITRE ATT&CK® Navigator (v5.3.2), rendering the layer committed at
   `attack-navigator/layer.json` from the author's own workstation.
@@ -327,9 +327,9 @@ later starts at `04` for the same reason.*
   queue, or the deployed workbook. Those would require a live workspace with real telemetry, and
   no such screenshot can be produced honestly from this repository.
 
-### `attack/04-attack-v19-domain-change.png`
+### `attack/03-attack-v19-domain-change.png`
 - **Provenance class:** Diagram
-- **Source:** `docs/diagrams/attack/04-attack-v19-domain-change.mmd`
+- **Source:** `docs/diagrams/attack/03-attack-v19-domain-change.mmd`
 - **Environment:** None. Rendered from the mapping discipline described in
   [`ATTACK.md`](ATTACK.md) and the vendored dataset at `scripts/attack_data.json`.
 - **Date:** 2026-09-11
@@ -341,7 +341,7 @@ later starts at `04` for the same reason.*
   silently dropping the techniques that moved.
 - **Redactions:** None required.
 
-### `attack/05-coverage-redundancy.png`
+### `attack/04-coverage-redundancy.png`
 - **Provenance class:** Generated chart
 - **Source:** `scripts/render_project_charts.py`, reading `attack-navigator/layer.json` and the 18
   scheduled rule files.
@@ -385,7 +385,7 @@ later starts at `04` for the same reason.*
 
 ## social
 
-### `social/preview-card.png`
+### `social/01-social-preview-card.png`
 - **Provenance class:** Generated chart
 - **Source:** `scripts/render_project_charts.py`, reading the rule files, the hunting queries,
   `attack-navigator/layer.json`, `tests/validation/atomics.yaml` and `Playbooks/`.

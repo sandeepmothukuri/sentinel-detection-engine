@@ -231,7 +231,7 @@ def chart_coverage_redundancy() -> pathlib.Path:
     for index, line in enumerate(caption):
         fig.text(0.012, 0.20 - index * 0.062, line, fontsize=8.8, color=MUTED, va="center")
     fig.tight_layout(rect=(0, 0.28, 1, 1))
-    return emit(fig, "attack/05-coverage-redundancy.png", {
+    return emit(fig, "attack/04-coverage-redundancy.png", {
         "covered_techniques": len(covered),
         "hunting_query_only": bars[0][1],
         "backed_by_one_rule": bars[1][1],
@@ -450,7 +450,7 @@ def chart_social_card() -> pathlib.Path:
     # GitHub renders the social preview at exactly 1280x640 and crops anything
     # else, so this figure keeps dpi=100 while the data charts moved to 200: the
     # card must be the size GitHub expects, not the size that looks best zoomed in.
-    return emit(fig, "social/preview-card.png", {
+    return emit(fig, "social/01-social-preview-card.png", {
         "rules": len(detections),
         "hunting_queries": len(hunting),
         "attack_techniques": len(layer["techniques"]),
@@ -462,10 +462,10 @@ def chart_social_card() -> pathlib.Path:
 
 
 BUILDERS = {
-    "attack/05-coverage-redundancy.png": chart_coverage_redundancy,
+    "attack/04-coverage-redundancy.png": chart_coverage_redundancy,
     "detections/04-inventory-overview.png": chart_inventory,
     "sentinel/03-validation-status.png": chart_validation_status,
-    "social/preview-card.png": chart_social_card,
+    "social/01-social-preview-card.png": chart_social_card,
 }
 
 

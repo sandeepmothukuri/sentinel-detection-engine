@@ -40,7 +40,7 @@ tests, and the full L3 SOC workflow documentation to go with them.
 | **Reporting** | L3 triage workbook (13 panels), generated ATT&CK coverage, static HTML dashboard preview |
 | **ATT&CK coverage** | 37 unique techniques across 12 of the 14 enterprise tactics |
 | **Validation** | 28 ledger entries; 31 cited atomic test references verified to exist upstream; 14 rules with a written manual procedure where no atomic can exercise them |
-| **Quality gates** | 18 checks in 9 families in `scripts/ci_validate.py`, 204 tests, 6 CI drift gates, secret scanning, SHA-pinned actions |
+| **Quality gates** | 18 checks in 9 families in `scripts/ci_validate.py`, 205 tests, 6 CI drift gates, secret scanning, SHA-pinned actions |
 | **Author** | Sandeep Mothukuri |
 
 ## Repository layout
@@ -54,7 +54,7 @@ sentinel-detection-engine/
 ├── deploy/                 28 ARM templates generated from the rule files
 ├── attack-navigator/       ATT&CK Navigator layer, generated
 ├── coverage.md             generated coverage report
-├── tests/                  204 tests, plus the validation ledger and the evidence templates
+├── tests/                  205 tests, plus the validation ledger and the evidence templates
 ├── scripts/                18 tools: validator, generators, renderers, intake
 ├── docs/                   26 documents: architecture through to the IR runbook
 └── .github/workflows/      validate, release and pull-request automation
@@ -84,7 +84,7 @@ sentinel-detection-engine/
 
 ```bash
 pip install -r requirements.txt          # the toolchain CI uses, declared once
-python -m pytest tests -q                # 204 tests, offline, under ten seconds
+python -m pytest tests -q                # 205 tests, offline, under ten seconds
 python scripts/ci_validate.py            # 18 checks over every rule and hunt
 python scripts/generate_coverage.py && git diff --exit-code   # generated artefacts are reproducible
 python scripts/render_project_charts.py --check               # every chart still matches its numbers
@@ -184,7 +184,7 @@ results to the telemetry-gap register rather than deleting them.
 
 ## 6. ATT&CK coverage
 
-![ATT&CK coverage by tactic](docs/images/attack/01-attack-coverage-by-tactic.png)
+![ATT&CK coverage by tactic](docs/images/attack/01-coverage-by-tactic.png)
 
 - **37 unique techniques**, **12 of 14 enterprise tactics** — see [`coverage.md`](coverage.md)
 - Generated from rule metadata; CI fails if `coverage.md` or `attack-navigator/layer.json` is stale
@@ -236,7 +236,7 @@ Every push and pull request runs:
 | `gitleaks` | Any committed secret. Never disabled, never `continue-on-error`. |
 | `yamllint` | Malformed rule, hunt and workflow YAML |
 | `scripts/ci_validate.py` | 18 checks in 9 families: **schema** (required fields, UUID and name uniqueness, severity and status vocabulary, `kind`) · **scheduling** (`queryFrequency` and `queryPeriod` bounds, frequency ≤ period) · **ATT&CK** (technique ids exist in the vendored MITRE matrix, tactics cohere) · **telemetry** (every table the query reads is produced by a declared connector) · **entity mapping** (identifiers are real and the columns exist) · **alert details** (placeholders reference columns the query returns) · **metadata** (the production bar: `validationStatus`, `falsePositives`, `tuningGuidance`, `suppression`) · **KQL** (lint, explicit `ago()` bound, `TimeGenerated` retained by the final projection) · **validation ledger** (one entry per rule and vice versa, closed status vocabulary, citations that resolve upstream, a trigger atomic or a manual procedure) |
-| `pytest` | 204 tests in twelve modules: 28 rule tests, 33 negative tests that prove the validator rejects bad input, 33 playbook safety-gate tests that hold the Logic Apps JSON to the behaviour `docs/SOAR.md` promises, 23 ledger tests, 16 tests of the generated deployment templates, 21 tests of image evidence hygiene, including the capture manifest that tracks which screenshots are still missing and the boundary that keeps images inside `docs/images/`, 12 tests of everything drawn or registered (diagram counts, the chart gates, the workbook wireframe, the register, and the coverage chart's own numbers), 9 backtesting-contract tests, 8 tests of the workflow files GitHub will accept, 7 Sigma converter tests, 11 tests that fail if a documented number drifts, including the validator's own check total, and 3 tests that keep the CI toolchain and `requirements.txt` from diverging |
+| `pytest` | 205 tests in twelve modules: 28 rule tests, 33 negative tests that prove the validator rejects bad input, 33 playbook safety-gate tests that hold the Logic Apps JSON to the behaviour `docs/SOAR.md` promises, 23 ledger tests, 16 tests of the generated deployment templates, 21 tests of image evidence hygiene, including the capture manifest that tracks which screenshots are still missing and the boundary that keeps images inside `docs/images/`, 13 tests of everything drawn or registered (diagram counts, the chart gates, the workbook wireframe, the register, and the coverage chart's own numbers), 9 backtesting-contract tests, 8 tests of the workflow files GitHub will accept, 7 Sigma converter tests, 11 tests that fail if a documented number drifts, including the validator's own check total, and 3 tests that keep the CI toolchain and `requirements.txt` from diverging |
 | `actionlint` | The workflow files themselves: expressions, action inputs, shell. Installed from `requirements.txt` and run as its own CI step, because a workflow GitHub refuses to start fails every job with zero jobs and no output |
 | `scripts/check_links.py` | Broken relative links in documentation |
 | Drift ×6 | `coverage.md` + `attack-navigator/layer.json`, `tests/atomics.md`, `deploy/`, `docs/metrics-matrix.md`, the workbook preview digest and the generated charts must match what the generators produce. The chart gate compares the numbers it would draw, then the digests — re-rasterising a chart is not a repository change |
@@ -254,7 +254,7 @@ its gate before publishing a signed-checksum archive.
 
 ## 10. Testing
 
-204 tests, no network access required, under ten seconds.
+205 tests, no network access required, under ten seconds.
 
 | Suite | What it covers |
 |---|---|
@@ -406,7 +406,7 @@ out in [`docs/limitations.md`](docs/limitations.md).
 ## 16. Roadmap
 
 **Completed** — the rule pack with its metadata bar; hunting queries with full hunt metadata; four
-playbooks with safety gates; 18-check CI validator; 204-test suite including negative tests;
+playbooks with safety gates; 18-check CI validator; 205-test suite including negative tests;
 generated ATT&CK coverage, validation ledger and ARM deployment templates, all drift-gated;
 evidence register; Microsoft current-state alignment; SHA-pinned CI with least privilege.
 

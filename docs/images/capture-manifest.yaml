@@ -16,7 +16,7 @@ shots:
     slug: navigator-export
     priority: 0
     status: captured
-    file: docs/images/attack/03-attack-navigator-export.png
+    file: docs/images/attack/02-navigator-export.png
     proves: The ATT&CK layer this repository generates is rendered by the official MITRE ATT&CK Navigator, so the coverage claim is reproducible in the tool a defender would actually open.
 
   - id: sentinel-incident-with-entities

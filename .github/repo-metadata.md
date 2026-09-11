@@ -58,7 +58,7 @@ Settings → Social preview → upload a 1280×640 PNG.
 
 Use one of the **original diagrams**, not a mockup of a portal: the architecture diagram
 (`docs/images/architecture/01-logical-architecture.png`) and the ATT&CK coverage chart
-(`docs/images/attack/01-attack-coverage-by-tactic.png`) are both source-controlled and generated from
+(`docs/images/attack/01-coverage-by-tactic.png`) are both source-controlled and generated from
 this repository's own content. Crop, place on a flat background and add the repository name.
 
 Do not use the workbook design preview as a social image. It is a deliberately data-free wireframe

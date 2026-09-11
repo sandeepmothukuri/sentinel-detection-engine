@@ -178,7 +178,7 @@ def main() -> int:
     ax.spines["bottom"].set_color("#d0d7de")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = OUT_DIR / "01-attack-coverage-by-tactic.png"
+    out = OUT_DIR / "01-coverage-by-tactic.png"
     fig.tight_layout()
     save_without_metadata(fig, out, facecolor="white")
     plt.close(fig)

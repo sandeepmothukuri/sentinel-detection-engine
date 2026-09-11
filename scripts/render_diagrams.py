@@ -51,7 +51,7 @@ LAYOUT: dict[str, tuple[str, int]] = {
     "hunting/01-hunt-to-detection-workflow.mmd": ("hunting/01-hunt-to-detection-workflow.png", 0),
     "soar/01-soar-safety-gate-flow.mmd": ("soar/01-soar-safety-gate-flow.png", 0),
     "soar/02-ir-lifecycle.mmd": ("soar/02-ir-lifecycle.png", 0),
-    "attack/04-attack-v19-domain-change.mmd": ("attack/04-attack-v19-domain-change.png", 0),
+    "attack/03-attack-v19-domain-change.mmd": ("attack/03-attack-v19-domain-change.png", 0),
     "ci-cd/01-validation-pipeline.mmd": ("ci-cd/01-validation-pipeline.png", 0),
     "ci-cd/02-release-and-pr-automation.mmd": ("ci-cd/02-release-and-pr-automation.png", 0),
 }

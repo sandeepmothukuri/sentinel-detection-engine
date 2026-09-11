@@ -4,6 +4,9 @@ Every file in this directory is either **generated from source in this repositor
 **captured screenshot of the author's own environment**. Nothing here is a mockup of a system
 that does not exist, and nothing is AI-generated imagery.
 
+[`gallery.md`](gallery.md) shows every image in order, grouped by area, with its provenance and what
+it demonstrates. This file is the directory layout and the rules; the gallery is the display.
+
 The full inventory — purpose, provenance, environment, date, what each image demonstrates and
 what was redacted — lives in [`../evidence.md`](../evidence.md). Read that before reusing or
 replacing an image.
