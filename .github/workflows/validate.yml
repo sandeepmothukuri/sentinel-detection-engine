@@ -79,18 +79,25 @@ jobs:
             exit 1
           fi
 
-      - name: Regenerate ARM templates and fail on drift
+      # --check rather than "regenerate and git diff": a rule added without its
+      # template produces an *untracked* file, which git diff cannot see. The
+      # checker enumerates deploy/ against the rule files, so it catches a missing
+      # template, a stale one and an orphaned one alike.
+      - name: Verify the ARM templates match the rules
+        run: python scripts/generate_arm_templates.py --check
+
+      - name: Regenerate the quality matrix and fail on drift
         run: |
-          python scripts/generate_arm_templates.py
-          if ! git diff --exit-code deploy/; then
-            echo "::error::deploy/ is stale. Run scripts/generate_arm_templates.py and commit the result."
+          python scripts/generate_metrics_matrix.py
+          if ! git diff --exit-code docs/metrics-matrix.md; then
+            echo "::error::docs/metrics-matrix.md is stale. Run scripts/generate_metrics_matrix.py"
             exit 1
           fi
 
       - name: Check the workbook design preview matches its recorded digest
         run: python scripts/render_design_preview.py --check
 
-      - name: Package rules for GitOps import
+      - name: Package the metadata-stripped rule YAML
         run: python scripts/package_rules.py
 
       - name: Upload packaged rules

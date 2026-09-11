@@ -31,7 +31,7 @@ query: |
 entityMappings: [...]     # columns projected by the query
 incidentConfiguration:    # incident creation + grouping
 eventGroupingSettings:
-metadata:                 # human-facing, stripped for GitOps import
+metadata:                 # human-facing; not a property of an analytics rule
   author: Sandeep Mothukuri
   validationStatus: static-validation
   telemetryDependency: ...

@@ -77,7 +77,7 @@
 
 <div class="grid">
 
-  <div class="card span-12">
+  <div data-panel="IncidentKPIs" class="card span-12">
     <h3>Incident KPIs <small>latest state per IncidentNumber</small></h3>
     <div class="kpis">
       <div class="kpi"><div class="v">—</div><div class="l">Incidents touched</div></div>
@@ -88,7 +88,7 @@
     </div>
   </div>
 
-  <div class="card span-4">
+  <div data-panel="IncidentsBySeverity" class="card span-4">
     <h3>Incidents by severity <small>latest state</small></h3>
     <div class="rows">
       <div class="row"><span class="name">High</span><span class="n">—</span></div>
@@ -98,22 +98,27 @@
     </div>
   </div>
 
-  <div class="card span-4">
+  <div data-panel="TopDetections" class="card span-4">
     <h3>Top firing detections <small>alert volume</small></h3>
     <div class="placeholder">Ranked list of alert names with their volume</div>
   </div>
 
-  <div class="card span-4">
+  <div data-panel="TacticHeatmap" class="card span-4">
     <h3>Alerts per ATT&amp;CK tactic <small>from SecurityAlert.Tactics</small></h3>
     <div class="placeholder">Tactic distribution once alerts exist</div>
   </div>
 
-  <div class="card span-6">
+  <div data-panel="DetectionTrend" class="card span-6">
     <h3>Detection trend <small>alert volume per day by severity</small></h3>
     <div class="placeholder">Daily time series — empty until incidents accumulate</div>
   </div>
 
-  <div class="card span-6">
+  <div data-panel="TopEntities" class="card span-6">
+    <h3>Top entities <small>accounts, hosts, IPs</small></h3>
+    <div class="placeholder">Entity frequency once incidents carry entity mappings</div>
+  </div>
+
+  <div data-panel="DetectionLatency" class="card span-6">
     <h3>Detection latency by rule <small>event time → alert time</small></h3>
     <table>
       <thead><tr><th>Rule</th><th>p50</th><th>p95</th><th>max</th></tr></thead>
@@ -125,7 +130,7 @@
       Compare against each rule's <code>queryFrequency</code> to see whether it is meeting its own promise.</p>
   </div>
 
-  <div class="card span-6">
+  <div data-panel="MTTA_MTTR" class="card span-6">
     <h3>MTTA / MTTR by severity <small>minutes</small></h3>
     <table>
       <thead><tr><th>Severity</th><th>MTTA avg</th><th>MTTA p95</th><th>MTTR avg</th><th>MTTR p95</th></tr></thead>
@@ -138,7 +143,7 @@
       MTTA = <code>FirstModifiedTime − CreatedTime</code>; MTTR is only defined for closed incidents.</p>
   </div>
 
-  <div class="card span-6">
+  <div data-panel="ClosureClassification" class="card span-6">
     <h3>Closed incidents by classification <small>the input to tuning</small></h3>
     <div class="rows">
       <div class="row"><span class="name">TruePositive</span><span class="n">—</span></div>
@@ -150,14 +155,14 @@
       Untriaged incidents are counted separately: they are not false positives.</p>
   </div>
 
-  <div class="card span-6">
+  <div data-panel="TuningIndicators" class="card span-6">
     <h3>Tuning candidates <small>≥ 30% false positives on ≥ 5 closures</small></h3>
     <div class="placeholder">
       Rules that clear the tuning gate appear here, with their closure counts and FP rate
     </div>
   </div>
 
-  <div class="card span-6">
+  <div data-panel="SLABreaches" class="card span-6">
     <h3>SLA breaches in the open queue <small>High &gt; 5 min, Medium &gt; 60 min</small></h3>
     <table>
       <thead><tr><th>Incident</th><th>Severity</th><th>Owner</th><th>Age</th><th>Ack</th></tr></thead>
@@ -165,7 +170,7 @@
     </table>
   </div>
 
-  <div class="card span-6">
+  <div data-panel="TelemetryFreshness" class="card span-6">
     <h3>Telemetry freshness <small>safe on partially deployed workspaces</small></h3>
     <table>
       <thead><tr><th>Source table</th><th>Last event</th><th>Age</th></tr></thead>
@@ -179,7 +184,7 @@
       A source with no row contributes nothing rather than breaking the panel.</p>
   </div>
 
-  <div class="card span-12">
+  <div data-panel="OpenIncidents" class="card span-12">
     <h3>Open incidents <small>latest state, owner and age</small></h3>
     <table>
       <thead><tr><th>Incident</th><th>Title</th><th>Severity</th><th>Status</th><th>Owner</th><th>Age</th></tr></thead>

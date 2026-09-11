@@ -27,7 +27,7 @@ tests, and the full L3 SOC workflow documentation to go with them.
 | **Reporting** | L3 triage workbook (13 panels), generated ATT&CK coverage, static HTML dashboard preview |
 | **ATT&CK coverage** | 37 unique techniques across 12 of the 14 enterprise tactics |
 | **Validation** | 28 ledger entries; 31 cited atomic test references verified to exist upstream; 14 rules with a written manual procedure where no atomic can exercise them |
-| **Quality gates** | 15 check families in `scripts/ci_validate.py`, 124 tests, 4 CI drift gates, secret scanning, SHA-pinned actions |
+| **Quality gates** | 15 check families in `scripts/ci_validate.py`, 133 tests, 5 CI drift gates, secret scanning, SHA-pinned actions |
 | **Author** | Sandeep Mothukuri |
 
 ## 2. Why this exists
@@ -172,10 +172,11 @@ Every push and pull request runs:
 | `gitleaks` | Any committed secret. Never disabled, never `continue-on-error`. |
 | `yamllint` | Malformed rule, hunt and workflow YAML |
 | `scripts/ci_validate.py` | 15 check families: schema, UUID, uniqueness, severity, status, `kind`, scheduling bounds, ATT&CK ids and tactic coherence, table↔connector parity, entity identifiers, alert-detail placeholders, metadata quality bar, placeholder text, KQL lint, explicit `ago()` bound, `TimeGenerated` retained by the final projection, and the whole validation ledger |
-| `pytest` | 124 tests in eight modules: 28 rule tests, 33 negative tests that prove the validator rejects bad input, 23 ledger tests, 16 tests of the generated deployment templates, 3 tests of the numbers drawn inside diagrams, 9 backtesting-contract tests, 7 Sigma converter tests, 5 tests that fail if a documented number drifts |
+| `pytest` | 133 tests in eight modules: 28 rule tests, 33 negative tests that prove the validator rejects bad input, 23 ledger tests, 16 tests of the generated deployment templates, 8 tests of the diagrams, the workbook wireframe and the image register, 9 backtesting-contract tests, 7 Sigma converter tests, 9 tests that fail if a documented number drifts, including that every rule appears in the generated quality matrix |
 | `scripts/check_links.py` | Broken relative links in documentation |
-| Drift ×4 | `coverage.md`, `attack-navigator/layer.json`, `tests/atomics.md`, `deploy/` and the workbook design preview must match what the generators produce |
+| Drift ×5 | `coverage.md` + `attack-navigator/layer.json`, `tests/atomics.md`, `deploy/`, `docs/metrics-matrix.md` and the workbook preview digest must match what the generators produce |
 | `scripts/generate_arm_templates.py` | Regenerates `deploy/` — the ARM templates a Sentinel Repositories connection actually consumes — from the rule files |
+| `scripts/generate_metrics_matrix.py` | Regenerates `docs/metrics-matrix.md` from the rule files and the validation ledger |
 | `scripts/package_rules.py` | Produces the metadata-stripped YAML artefact for manual import |
 
 Security posture: `permissions: contents: read` at workflow level, write scope only on the job
@@ -188,7 +189,7 @@ its gate before publishing a signed-checksum archive.
 
 ## 10. Testing
 
-124 tests, no network access required, under eight seconds.
+133 tests, no network access required, under eight seconds.
 
 | Suite | What it covers |
 |---|---|
@@ -197,8 +198,8 @@ its gate before publishing a signed-checksum archive.
 | `tests/test_validator_negative.py` | 33 negative tests for the validator itself — a rule with a 30-day period, an undeclared connector, a mismatched technique, a dropped `TimeGenerated`, invalid KQL, placeholder text and AI-style author attribution must each fail with the right message |
 | `tests/test_arm_templates.py` | The deployable artefact: every rule and hunt has a template, no property outside the alert-rule schema is emitted, the `metadata:` authoring block never leaks into a template, the resource name derives from the committed rule id so a re-sync updates rather than duplicates, and the converter refuses what it does not understand |
 | `tests/test_backtest.py` | The backtesting contract: plan-only runs execute nothing and write nothing, a run without a workspace fails instead of producing a placeholder, and every query rewrite is reported |
-| `tests/test_diagrams.py` | The numbers printed inside diagram sources — per-table rule counts and the detection inventory — must match the rule files |
-| `tests/test_documented_numbers.py` | Fails the build when a rule, hunt, ledger entry, image, component or test count quoted in the README or `docs/testing.md` no longer matches the repository |
+| `tests/test_diagrams.py` | The content of the pictures: numbers printed inside diagram sources, the architecture table-to-connector mapping, parity between the workbook and its HTML wireframe, and an evidence-register entry for every committed image |
+| `tests/test_documented_numbers.py` | Fails the build when a count quoted in the README, `docs/testing.md`, `docs/architecture.md`, the README telemetry table or `docs/deployment.md` stops matching the repository |
 
 A validator that has never rejected anything is untested, which is why the negative suite exists
 and why one of its tests asserts that a rule claiming an invalid status fails with an actionable
@@ -325,7 +326,7 @@ out in [`docs/limitations.md`](docs/limitations.md).
 ## 16. Roadmap
 
 **Completed** — the rule pack with its metadata bar; hunting queries with full hunt metadata; four
-playbooks with safety gates; 15-family CI validator; 124-test suite including negative tests;
+playbooks with safety gates; 15-family CI validator; 133-test suite including negative tests;
 generated ATT&CK coverage, validation ledger and ARM deployment templates, all drift-gated;
 evidence register; Microsoft current-state alignment; SHA-pinned CI with least privilege.
 

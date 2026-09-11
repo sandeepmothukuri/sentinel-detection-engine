@@ -145,6 +145,10 @@ supplying a picture that implies otherwise.
 
 ## attack
 
+*Numbering note: there is no `attack/02`. The Navigator export was renumbered to `03` when it moved
+into this directory, and the number was left as a gap rather than reused, so that a link to the old
+path fails loudly instead of silently resolving to a different image.*
+
 ### `attack/01-attack-coverage-by-tactic.png`
 - **Provenance class:** Generated chart
 - **Source:** `scripts/render_coverage_chart.py`, reading `attack-navigator/layer.json`,
@@ -184,6 +188,35 @@ supplying a picture that implies otherwise.
   queue, or the deployed workbook. Those would require a live workspace with real telemetry, and
   no such screenshot can be produced honestly from this repository.
 
+## ci-cd
+
+### `ci-cd/01-validation-pipeline.png`
+- **Provenance class:** Diagram
+- **Source:** `docs/diagrams/ci-cd/01-validation-pipeline.mmd`
+- **Environment:** None. Every gate named in the flow exists as a step in
+  `.github/workflows/validate.yml`; the diagram is a rendering of that file, not a screenshot of a
+  run.
+- **Date:** 2026-09-11
+- **Demonstrates:** The order of the checks a change must survive on the way to `main`, including
+  the five drift gates (coverage and layer, validation ledger, `deploy/`, quality matrix, workbook preview digest)
+  that fail the build when a generated artefact stops matching the files it is derived from. The
+  sequence is the argument: nothing reaches the packaging step until the generated artefacts have
+  been proven reproducible.
+- **Redactions:** None required.
+
+### `ci-cd/02-release-and-pr-automation.png`
+- **Provenance class:** Diagram
+- **Source:** `docs/diagrams/ci-cd/02-release-and-pr-automation.mmd`
+- **Environment:** None. Both workflows are committed at `.github/workflows/release.yml` and
+  `.github/workflows/pr-detection-report.yml`.
+- **Date:** 2026-09-11
+- **Demonstrates:** That a release re-runs the entire validation pipeline rather than trusting the
+  tagged tree, and that the pull-request path splits the job that runs contributor code
+  (read-only) from the job that holds the comment permission (runs no contributor code, consumes
+  only the uploaded artefact). The diagram lists what the release archive actually contains,
+  including the generated `deploy/` templates.
+- **Redactions:** None required.
+
 ---
 
 ## What is deliberately absent from this register
@@ -213,7 +246,19 @@ python scripts/render_coverage_chart.py
 # The numbers behind the layer and the chart
 python scripts/generate_coverage.py
 python scripts/generate_atomics_ledger.py
+
+# The ARM deployment set a Sentinel Repositories connection consumes
+python scripts/generate_arm_templates.py
+python scripts/generate_arm_templates.py --check    # CI gate
+
+# The per-rule quality matrix
+python scripts/generate_metrics_matrix.py
+python scripts/generate_metrics_matrix.py --check   # CI gate
 ```
+
+All six generators are deterministic and are invoked by CI, which fails on any diff they produce.
+If an artefact in this repository and the command that generates it ever disagree, the command is
+right and the file is stale.
 
 Screenshot provenance cannot be re-derived from the repository. That is exactly why it is
 recorded here in prose, with its environment and date, instead of being left for the reader to

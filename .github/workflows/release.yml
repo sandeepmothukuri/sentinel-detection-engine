@@ -50,11 +50,14 @@ jobs:
           python -m pytest tests -q
           python scripts/generate_coverage.py
           python scripts/generate_atomics_ledger.py
-          python scripts/generate_arm_templates.py
-          if ! git diff --exit-code coverage.md attack-navigator/layer.json tests/atomics.md deploy; then
+          if ! git diff --exit-code coverage.md attack-navigator/layer.json tests/atomics.md; then
             echo "::error::generated artefacts do not match the tagged tree"
             exit 1
           fi
+          # The template checker enumerates deploy/ against the rule files, so it
+          # also fails on a template that is missing rather than only on one that
+          # changed. git diff cannot see a file that was never added.
+          python scripts/generate_arm_templates.py --check
 
       - name: Build the release archive
         run: |

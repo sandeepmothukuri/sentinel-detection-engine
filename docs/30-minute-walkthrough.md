@@ -1,6 +1,8 @@
 # 30-minute walkthrough — get real Sentinel screenshots
 
-Follow this top-to-bottom. Every step is copy-paste or click-by-click. At the end you have a working Sentinel tenant, real incidents firing on real rules, and four legitimate screenshots for your portfolio.
+Follow this top-to-bottom. Every step is copy-paste or click-by-click. At the end you have a working Sentinel tenant, real incidents firing on real rules, and seven captures you own and can defend in an interview.
+
+**The repository ships none of them.** Screenshots of a live workspace cannot be produced from a repository, and an invented one would be a fabrication. What is here instead is the procedure, the file names, and the register your captures must be recorded in ([`evidence.md`](evidence.md)).
 
 **Time:** ~30 min active + 10–15 min of waiting for log ingestion
 **Cost:** $0 (Microsoft credits cover everything in the trial window)
@@ -259,15 +261,19 @@ Keep the dev tenant — it's free indefinitely.
 
 ## Recap — the screenshots that would be legitimate
 
-| # | File | Source | Defensible |
-|---|---|---|---|
-| 1 | `01-sentinel-overview.png` | Your Sentinel workspace | Yes — you set it up |
-| 2 | `02-data-connectors.png` | Your connectors | Yes — you connected them |
-| 3 | `03-analytics-rules.png` | Your 18 rules deployed | Yes — your code |
-| 4 | `04-attack-navigator.png` | Navigator + your layer.json | Yes — your coverage data |
-| 5 | `05-incident-list.png` | Real incident on your tenant | Yes — your rule fired on your atomic |
-| 6 | `06-investigation-graph.png` | Same incident's entity graph | Yes |
-| 7 | `07-workbook-live.png` | Your workbook with live data | Yes — your JSON, your data |
+Captures are numbered from `10` so they never collide with a generated diagram, and each goes in the
+directory for its subject. Register every one of them in [`evidence.md`](evidence.md) — environment,
+date, what it demonstrates, what you redacted — before you commit it.
+
+| # | Destination | What it shows | Why it is defensible | Redact before committing |
+|---|---|---|---|---|
+| 1 | `docs/images/sentinel/10-lab-workspace-overview.png` | Your Sentinel workspace | You set it up | Subscription and workspace ids |
+| 2 | `docs/images/sentinel/11-lab-data-connectors.png` | The connectors you enabled | You connected them | Tenant name, tenant id |
+| 3 | `docs/images/ci-cd/10-lab-analytics-rules.png` | Your imported rules, enabled | Your code | — |
+| 4 | `docs/images/attack/10-lab-navigator-v19.png` | Navigator rendering `layer.json` against the v19 domain | Your coverage data | — |
+| 5 | `docs/images/detections/10-lab-incident-from-atomic.png` | The incident an atomic produced | Your rule fired on a behaviour you executed | Account, host and IP |
+| 6 | `docs/images/detections/11-lab-investigation-graph.png` | The same incident's entity graph | Same evidence, wider view | Account, host and IP |
+| 7 | `docs/images/workbooks/10-lab-dashboard-live.png` | Your workbook rendering real telemetry | Your JSON, your data | Account, host and IP |
 
 Every one of these you can walk an interviewer through, because you produced it. That is the bar —
 and it is why this repository ships none of them: a screenshot taken from a tenant that does not

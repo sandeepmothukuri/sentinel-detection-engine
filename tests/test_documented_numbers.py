@@ -13,12 +13,15 @@ which is the intended pressure.
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
 
 import pytest
 import yaml
+from collections import Counter
+
 from conftest import REPO
 
 README = REPO / "README.md"
@@ -85,6 +88,98 @@ def test_every_test_module_is_documented_with_its_real_count():
             wrong.append(f"{name}: documented {row.group(1)}, actual {actual}")
     assert not missing, f"docs/testing.md has no row for: {missing}"
     assert not wrong, f"docs/testing.md test counts are stale: {wrong}"
+
+
+def table_and_connector_counts() -> tuple[dict[str, int], dict[str, tuple[int, int]]]:
+    """Rules per table, and detections+hunts per connector, from the rule files."""
+    per_table, per_connector = Counter(), {}
+    for pattern in ("Detections/*.yaml", "Hunting Queries/*.yaml"):
+        for path in sorted(REPO.glob(pattern)):
+            rule = yaml.safe_load(path.read_text(encoding="utf-8"))
+            is_detection = path.parent.name == "Detections"
+            for connector in rule.get("requiredDataConnectors") or []:
+                det, hunt = per_connector.get(connector["connectorId"], (0, 0))
+                per_connector[connector["connectorId"]] = (
+                    det + (1 if is_detection else 0), hunt + (0 if is_detection else 1))
+                for table in connector.get("dataTypes") or []:
+                    per_table[table] += 1
+    return per_table, per_connector
+
+
+def test_readme_telemetry_table_counts_match_the_rules():
+    """The README states how many rules read each table. Those counts were correct
+    when they were typed and are checked here, so they stay correct."""
+    per_table, _ = table_and_connector_counts()
+    text = README.read_text(encoding="utf-8")
+    section = text.split("## 7. Telemetry", 1)[1].split("\n## ", 1)[0]
+    rows = [ln for ln in section.splitlines() if ln.startswith("|") and "---" not in ln]
+    checked = 0
+    for row in rows:
+        tables = re.findall(r"`([A-Za-z][A-Za-z0-9_]+)`", row)
+        if not tables or "| Rules |" in row:
+            continue
+        counts = [int(c) for c in re.findall(r"\d+", row.split("|")[-2])]
+        assert len(counts) == len(tables), f"README row has {len(tables)} tables and {len(counts)} counts: {row}"
+        for table, stated in zip(tables, counts):
+            assert stated == per_table.get(table, 0), (
+                f"README says {stated} rules read {table}; the rule files declare {per_table.get(table, 0)}")
+            checked += 1
+    assert checked == len(per_table), (
+        f"README telemetry table covers {checked} tables, the rules declare {len(per_table)}")
+
+
+def test_deployment_connector_counts_match_the_rules():
+    """docs/deployment.md tells a deployer how much of the pack each connector
+    carries. A wrong number there means a partially deployed workspace looks
+    complete, so it is asserted rather than trusted."""
+    _, per_connector = table_and_connector_counts()
+    text = (REPO / "docs" / "deployment.md").read_text(encoding="utf-8")
+    section = text.split("## Data connectors required by this pack", 1)[1].split("\n## ", 1)[0]
+    checked = 0
+    for row in [ln for ln in section.splitlines() if ln.startswith("|") and "---" not in ln]:
+        # The first backticked token on the row is the connector id; the "Feeds"
+        # column also uses backticks for table names.
+        first = re.search(r"`([A-Za-z0-9_]+)`", row)
+        if not first:
+            continue
+        connector_id = first.group(1)
+        if connector_id not in per_connector:
+            continue
+        det = re.search(r"(\d+) detections?", row)
+        hunt = re.search(r"(\d+) hunts?", row)
+        actual_det, actual_hunt = per_connector.get(connector_id, (0, 0))
+        if det:
+            assert int(det.group(1)) == actual_det, (
+                f"deployment.md says {connector_id} carries {det.group(1)} detections; it carries {actual_det}")
+        if hunt:
+            assert int(hunt.group(1)) == actual_hunt, (
+                f"deployment.md says {connector_id} carries {hunt.group(1)} hunts; it carries {actual_hunt}")
+        checked += 1
+    assert checked == len(per_connector), (
+        f"deployment.md documents {checked} connectors, the rules declare {len(per_connector)}")
+
+
+def test_dashboard_panel_count_is_stated_consistently():
+    """The workbook, the README and the HTML wireframe all state a panel count."""
+    wb = json.loads((REPO / "Workbooks" / "L3-Triage-Dashboard.json").read_text(encoding="utf-8"))
+    items = list(wb["items"].values()) if isinstance(wb["items"], dict) else wb["items"]
+    panels = [i for i in items if "query" in (i.get("content") or {})]
+    readme = README.read_text(encoding="utf-8")
+    assert f"L3 triage workbook ({len(panels)} panels)" in readme, (
+        f"README does not state the workbook's real panel count ({len(panels)})")
+
+
+def test_metrics_matrix_is_current_and_covers_every_rule():
+    """The quality matrix is generated. CI has the drift gate; this makes the same
+    failure visible to a local `pytest`, and pins the coverage claim — every
+    detection must have a row, which is the defect that motivated generating it."""
+    proc = subprocess.run([sys.executable, str(REPO / "scripts" / "generate_metrics_matrix.py"), "--check"],
+                          capture_output=True, text=True, cwd=REPO, check=False)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    matrix = (REPO / "docs" / "metrics-matrix.md").read_text(encoding="utf-8")
+    for path in sorted((REPO / "Detections").glob("*.yaml")):
+        assert f"`{path.stem}`" in matrix, (
+            f"{path.stem} has no row in docs/metrics-matrix.md — a rule outside the framework is unmeasured")
 
 
 def test_component_table_counts_match_the_repository():

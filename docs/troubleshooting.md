@@ -15,7 +15,7 @@
 ## Inbox rule / Exchange detections miss events
 
 - Exchange **admin** audit logging must be enabled (it is by default in most tenants; verify via `Get-AdminAuditLogConfig`).
-- The `Parameters` dynamic array format is the single most fragile part — if Microsoft changes the serialisation, re-check the `mv-expand p = Parameters` block. A regression test pins the pattern (`test_inbox_rule_uses_mv_expand_parameters`).
+- The `Parameters` dynamic array format is the single most fragile part — if Microsoft changes the serialisation, re-check the `mv-expand p = Parameters` block. A regression test pins the pattern, including that the keys are read capitalised as the payload actually serialises them (`tests/test_rules.py::test_inbox_rule_reads_capitalised_parameters`).
 
 ## MDE hunts return nothing
 
@@ -36,14 +36,34 @@
 
 ## CI failures
 
+### Generated-artefact drift
+
+These four gates all mean the same thing: a file that is derived from other files no longer matches
+them. The fix is always to run the generator and commit what it writes — never to hand-edit the
+generated file, and never to regenerate the *source* from the artefact.
+
 | Failure | Fix |
 |---|---|
-| `coverage.md or layer.json is stale` | Run `python scripts/generate_coverage.py`, commit results |
+| `coverage.md or attack-navigator/layer.json is stale` | `python scripts/generate_coverage.py`, commit the result |
+| `tests/atomics.md is stale` | `python scripts/generate_atomics_ledger.py`, commit the result. The YAML ledger is the source of truth; the markdown is rendered from it |
+| `deploy/ is stale`, `… is missing`, `… has no corresponding rule` | `python scripts/generate_arm_templates.py`, commit the result |
+| `docs/metrics-matrix.md is stale` | `python scripts/generate_metrics_matrix.py`, commit the result |
+| `design preview digest mismatch` | The workbook changed and the preview PNG did not: `python scripts/render_design_preview.py`, commit the image and its `.sha256` |
+
+### Validation failures
+
+| Failure | Fix |
+|---|---|
 | `technique Txxxx not found in current ATT&CK matrix` | Technique revoked/deprecated in MITRE CTI — replace with successor (see [ATTACK.md](ATTACK.md)) |
 | `tactic mismatch` | Rule tactics contradict the referenced techniques' phases |
 | `table X requires connector Y` | Add the connector + data type to `requiredDataConnectors`, or add the table to `TABLE_CATALOG` if it's a legitimate new source |
+| `queryPeriod exceeds` / `frequency > period` | Sentinel's ceiling is 14 days; a longer period is accepted by the linter and rejected by the platform |
+| `mapped column is an array` | Sentinel cannot entity-map `make_set`/`make_list` output. Project a scalar first |
+| `TimeGenerated dropped by the final projection` | Keep it: incident timelines and the workbook's latency tile read it |
 | `invalid KQL set operator` | `endswith any` etc. don't exist — use `has_any`, `in`, or per-element predicates |
 | `odd number of double quotes` / `unclosed brackets` | KQL lint caught a syntax break; the scanner is string-aware, so this is usually a real defect |
+| `stale counts still documented` / `does not state the real test total` | A number in the README or `docs/testing.md` no longer matches the repository. Update the prose — the test measures the repository, so the repository is right |
+| `broken relative link` | `python scripts/check_links.py` names the file and the target |
 
 ## Still stuck
 

@@ -17,22 +17,21 @@ No metric in this file is invented. Values are recorded only when they can be ba
 
 ## Per-rule quality matrix
 
-Precision, recall, FP rate, and alert volume are **blank until a live or simulated deployment produces them**. The workbook computes them from `SecurityIncident`/`SecurityAlert` automatically once data exists (see formulas below).
+The matrix is **generated**: [`metrics-matrix.md`](metrics-matrix.md) lists all 18 rules with their
+severity, telemetry, the author's stated expected volume, how each rule would be exercised, and its
+validation status. It is produced by `scripts/generate_metrics_matrix.py` from the rule files and the
+validation ledger, and CI fails if the committed file differs from what those files produce.
 
-| Rule | Telemetry dependency | Severity | Expected volume (stated, unmeasured) | Precision | FP rate | Alert volume (30d) | Test status | Tuning status |
-|---|---|---|---|---|---|---|---|---|
-| EntraID_ImpossibleTravel | SigninLogs | High | Low | — | — | — | manual-only | untuned |
-| EntraID_MFAFatigue | SigninLogs | High | Very low | — | — | — | manual-only | untuned |
-| EntraID_LegacyAuthSuccess | SigninLogs | High | ~0 post-CA-block | — | — | — | manual-only | untuned |
-| EntraID_ServicePrincipalCredAdd | AuditLogs | High | Low | — | — | — | manual-only | untuned |
-| M365_InboxRuleExfil | OfficeActivity | High | Very low | — | — | — | T1114.003-1 mapped | untuned |
-| M365_MassSharePointDownload | OfficeActivity (14d baseline) | Medium | Low post-exclusions | — | — | — | manual-only | untuned |
-| M365_OAuthConsentSuspiciousApp | AuditLogs | High | Low | — | — | — | T1528-1 mapped | untuned |
-| MDE_LOLBin_Rundll32_Network | DeviceProcess+Network | High | Low | — | — | — | T1218.011-1/-23 mapped | untuned |
-| MDE_MSHTA_RemoteScript | DeviceProcessEvents | High | Very low | — | — | — | T1218.005-1/-2 mapped | untuned |
-| MDE_PowerShell_EncodedCommand | DeviceProcessEvents | High | Low, bursts on rollouts | — | — | — | T1059.001-1/-3 mapped | untuned |
-| Azure_NSG_OpenToInternet | AzureActivity | High | Low | — | — | — | manual-only | untuned |
-| Azure_KeyVault_SecretAccessSpike | AzureDiagnostics (14d baseline) | High | Very low | — | — | — | manual-only | untuned |
+That is deliberate. The matrix used to be typed by hand on this page, and when the pack grew from 12
+rules to 18, six rules silently did not appear here — a detection with no row in the quality framework
+is a detection nobody is measuring. A table whose every column is derivable must be derived.
+
+**Measurement columns are absent from the generated matrix on purpose.** Events evaluated, alerts,
+true positives, false positives, precision, FP rate, alert volume per day, latency, MTTA, MTTR,
+suppression rate and closure reason all require a deployed rule and closed incidents. They are defined
+in [`tests/validation/performance-metrics.md`](../tests/validation/performance-metrics.md), and a
+measured value is recorded there against a named tenant and window — not typed into a matrix that
+describes the rules themselves.
 
 ## Formulas (computed by the workbook once incidents exist)
 

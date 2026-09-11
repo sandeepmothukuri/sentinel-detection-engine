@@ -14,7 +14,7 @@ something is unproven, it says so instead of implying otherwise.
 | Dimension | Score | Meaning of the score |
 |---|---|---|
 | Portfolio readiness | **9 / 10** | Ready to show. Content, automation, tests, documentation and generated artefacts are all consistent and reproducible. |
-| Engineering maturity | **7 / 10** | Real validation tooling, real negative tests, four drift gates, and a deployment artifact generated from the validated rules. Held back by the absence of execution history. |
+| Engineering maturity | **7 / 10** | Real validation tooling, real negative tests, five drift gates, and a deployment artifact generated from the validated rules. Held back by the absence of execution history. |
 | Production readiness | **5 / 10** | Deployable content with correct semantics, but nobody has run it against live telemetry. Tuning thresholds are unvalidated estimates. |
 | Operational validation | **1 / 10** | Static validation only. Zero rules have produced an alert outside CI. Deliberately scored at the floor because nothing has been observed. |
 
@@ -29,11 +29,12 @@ validation *is* the point: the repository is honest about which of the two it de
 | Query correctness at the syntax and schema level | Ready | `kql_lint` plus explicit table, connector, entity and alert-detail parity checks |
 | ATT&CK accuracy | Ready | Every technique validated against the vendored MITRE CTI dataset; tactic coherence enforced; retired ids rejected |
 | Reproducible coverage reporting | Ready | `coverage.md` and `attack-navigator/layer.json` regenerated in CI with a drift gate |
+| Reproducible quality matrix | Ready | `docs/metrics-matrix.md` generated from the rules and the ledger, drift-gated, so the framework cannot lose a rule |
 | Deployable artifacts | Ready to deploy | `deploy/analytic-rules/` and `deploy/hunting-queries/` hold 28 generated ARM templates — the format a Sentinel Repositories connection actually consumes — regenerated and drift-gated in CI |
 | Validation honesty | Ready | `tests/validation/atomics.yaml` → `tests/atomics.md`, with atomic citations checked against upstream and evidence requirements for any claim above static validation |
 | Response automation design | Ready | Four playbooks, each behind a confidence threshold and allowlist parameters, with a documented rollback path |
 | Analyst-facing workbook | Ready to deploy | 13 panels, all reading `SecurityIncident`/`SecurityAlert` with real column names |
-| CI/CD | Ready | Secret scanning, lint, validation, tests, four drift gates, least-privilege permissions, SHA-pinned actions, Dependabot |
+| CI/CD | Ready | Secret scanning, lint, validation, tests, five drift gates, least-privilege permissions, SHA-pinned actions, Dependabot |
 
 ## 3. What needs the deployer's input
 

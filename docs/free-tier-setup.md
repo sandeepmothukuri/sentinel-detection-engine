@@ -8,7 +8,7 @@ A working Microsoft Sentinel environment is the fastest way to take real, defens
 - New Azure free account with $200 credit (30 days)
 - Sentinel free trial — 10 GB/day for 31 days
 - A Windows 11 VM onboarded to Microsoft Defender for Endpoint trial
-- This entire rule pack deployed via GitOps
+- This entire rule pack deployed through a Sentinel Repositories connection, from the generated ARM templates in `deploy/`
 
 Estimated cost across the trial window: **$0** if you cap log ingestion at 10 GB/day.
 

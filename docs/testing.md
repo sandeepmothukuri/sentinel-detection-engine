@@ -27,10 +27,11 @@ This repository separates **what CI can prove** from **what only a live tenant c
 | ATT&CK | `scripts/ci_validate.py` + vendored `scripts/attack_data.json` (MITRE CTI, 697 techniques; revoked/deprecated excluded) | Technique ids exist and tactics are consistent |
 | Telemetry | `scripts/ci_validate.py` (`TABLE_CATALOG`) | Every table the query reads is produced by a declared connector/dataType |
 | KQL lint | `scripts/kql_lint.py` | Bracket/quote balance (string-aware), invalid set operators, `matches regex`/`extract()` regex validity, no `now()` in scheduled rules |
-| Python tests | `pytest tests/` (124 tests) | Regressions: parameter parsing patterns, uniqueness, honest validation statuses, JSON artifacts parse |
+| Python tests | `pytest tests/` (133 tests) | Regressions: parameter parsing patterns, uniqueness, honest validation statuses, JSON artifacts parse |
 | Coverage drift | `validate.yml` | `coverage.md` + Navigator layer regenerate byte-identical |
 | ARM drift | `validate.yml` | `deploy/` regenerates byte-identical from the rule files |
 | Preview digest | `scripts/render_design_preview.py --check` | The committed workbook preview matches the digest of the workbook definition it was drawn from |
+| Quality matrix | `validate.yml` | `docs/metrics-matrix.md` regenerates byte-identical from the rule files and the ledger |
 | Links | `scripts/check_links.py` | No broken relative markdown links |
 | Secrets | gitleaks | Nothing credential-shaped is committed |
 
@@ -44,8 +45,8 @@ This repository separates **what CI can prove** from **what only a live tenant c
 | `tests/test_backtest.py` | 9 | The backtesting contract: plan-only runs execute nothing, a run without a workspace refuses instead of inventing a result, and every query rewrite is reported |
 | `tests/test_sigma_converter.py` | 7 | Sigma translation, including that a prefix match is never silently widened into a substring match |
 | `tests/test_arm_templates.py` | 16 | The deployable artefact: `deploy/` matches the rule files, every emitted property is a real alert-rule property, the resource name uses the committed rule id, and the converter refuses timespans and trigger operators it does not understand |
-| `tests/test_diagrams.py` | 3 | Numbers printed inside diagram sources: the connector-coverage counts and the architecture diagram's detection inventory must match the rule files, so a picture cannot quietly go stale |
-| `tests/test_documented_numbers.py` | 5 | The numbers themselves: rule, hunt, ledger-entry and image totals, per-module test counts, and the test total quoted here and in the README |
+| `tests/test_diagrams.py` | 8 | Everything drawn or registered about the content: numbers printed inside diagram sources, the architecture table-to-connector mapping, the workbook wireframe's panel parity, the absence of invented values in that wireframe, and a register entry in `docs/evidence.md` for every committed image |
+| `tests/test_documented_numbers.py` | 9 | The numbers themselves: rule, hunt, ledger, image and test totals; the README telemetry table and the deployment connector table; the workbook panel count; and the freshness of the generated quality matrix |
 
 `python -m pytest tests -q` runs all of them offline in under four seconds.
 [`tests/test_documented_numbers.py`](../tests/test_documented_numbers.py) fails the build if this

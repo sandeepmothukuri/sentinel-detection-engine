@@ -46,13 +46,22 @@ Each rule YAML carries:
 
 ## Data source coverage
 
-| Table | Source | Rules |
-|---|---|---|
-| `SigninLogs` | Entra ID connector | Impossible Travel, MFA Fatigue, Legacy Auth, 3 hunts |
-| `AuditLogs` | Entra ID connector | SP Credential Added, OAuth Consent, Guest Privilege hunt |
-| `OfficeActivity` | Office 365 connector | Inbox Rule, Mass Download, Mailbox Forwarding hunt |
-| `DeviceProcessEvents` / `DeviceNetworkEvents` / `DeviceInfo` | Defender for Endpoint (M365 advanced hunting) | 3 MDE rules, 6 hunts |
-| `AzureActivity` | Azure Activity connector | NSG Exposure |
-| `AzureDiagnostics` | Key Vault diagnostic settings | Key Vault Spike |
+Which connector produces which table. **This table deliberately carries no rule counts.** It
+carried them once, named rule by rule, and went stale the moment the rule pack grew; counts of
+rules per table now live only in
+[`docs/images/sentinel/01-connector-table-coverage.png`](images/sentinel/01-connector-table-coverage.png),
+whose numbers `tests/test_diagrams.py` recomputes from `requiredDataConnectors` on every build. The
+set of tables below is checked the same way, so a new table cannot appear in the rules without
+appearing here.
 
-See [data-sources.md](data-sources.md) for connector setup details.
+| Table | Produced by |
+|---|---|
+| `SigninLogs`, `AuditLogs` | Entra ID connector |
+| `OfficeActivity` | Office 365 connector |
+| `DeviceProcessEvents`, `DeviceNetworkEvents`, `DeviceFileEvents`, `DeviceInfo` | Defender XDR advanced hunting (MDE onboarding required) |
+| `AzureActivity` | Azure Activity connector |
+| `AzureDiagnostics` | Key Vault diagnostic settings |
+
+Setup detail, retention and the assumptions each query makes: [data-sources.md](data-sources.md).
+The workbook reads `SecurityIncident` and `SecurityAlert`, which are native to Sentinel and need no
+connector.
