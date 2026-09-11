@@ -302,3 +302,30 @@ def test_every_image_reaches_a_reader():
     assert not orphans, (
         "these images are committed but no document embeds them, so nothing renders "
         "them:\n  " + "\n  ".join(orphans))
+
+
+def test_the_gallery_is_generated_from_the_register():
+    """docs/images/gallery.md copies its descriptions out of docs/evidence.md and
+    its pending table out of the capture manifest, so it is generated rather than
+    typed. This asserts the committed file is what the generator produces right
+    now: if the register's wording changes and the gallery is not regenerated, the
+    page that shows the evidence describes it differently from the register.
+
+    Determinism is asserted by building twice — a generator that reorders its
+    output between runs would fail in CI for no reason."""
+    sys.path.insert(0, str(REPO / "scripts"))
+    import generate_image_gallery as gallery
+
+    first, second = gallery.build(), gallery.build()
+    assert first == second, "the gallery generator is not deterministic"
+    committed = gallery.GALLERY.read_text(encoding="utf-8")
+    assert committed == first, (
+        "docs/images/gallery.md is stale: run scripts/generate_image_gallery.py "
+        "and commit the result")
+
+    # And the generator refuses to describe an image the register does not.
+    assert "Not yet captured" in committed
+    pending = gallery.read_pending()
+    assert all(f"| `{shot['id']}` |" in committed for shot in pending), (
+        "a shot pending in capture-manifest.yaml is missing from the gallery's "
+        "uncaptured table")

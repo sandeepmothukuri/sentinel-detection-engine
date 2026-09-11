@@ -127,6 +127,7 @@ def test_the_validation_workflow_runs_every_gate_the_repository_claims() -> None
         "quality matrix": "python scripts/generate_metrics_matrix.py",
         "preview digest": "render_design_preview.py --check",
         "chart data and digest": "render_project_charts.py --check",
+        "gallery drift": "generate_image_gallery.py --check",
         "packaging": "python scripts/package_rules.py",
     }
     missing = [name for name, needle in required.items() if needle not in workflow]

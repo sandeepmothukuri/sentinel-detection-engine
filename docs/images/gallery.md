@@ -172,7 +172,7 @@ What runs on every commit, and what happens on a release.
 
 ![01 validation pipeline](ci-cd/01-validation-pipeline.png)
 
-*Diagram* — The order of the checks a change must survive on the way to `main`, including the six drift gates (coverage and layer, validation ledger, `deploy/`, quality matrix, workbook preview digest, generated charts) that fail the build when a generated artefact stops matching the files it is derived from. The sequence is the argument: nothing reaches the packaging step until the generated artefacts have been proven reproducible.
+*Diagram* — The order of the checks a change must survive on the way to `main`, including the seven drift gates (coverage and layer, validation ledger, `deploy/`, quality matrix, workbook preview digest, generated charts, the image gallery) that fail the build when a generated artefact stops matching the files it is derived from. The sequence is the argument: nothing reaches the packaging step until the generated artefacts have been proven reproducible.
 
 ### `ci-cd/02-release-and-pr-automation.png`
 
@@ -207,7 +207,7 @@ These 9 shots are on the list and have **no image**. Each needs a live Sentinel 
 | `soar-playbook-run-history` | `soar` | 5 | The safety gates are observable per run, including the accounts a gate skipped, which is the behaviour the documentation promises and a diagram cannot demonstrate. |
 | `hunting-query-results` | `hunting` | 6 | A hunting query executes against its declared telemetry table and returns the columns and row shape its README describes. |
 | `ci-actions-run-green` | `ci-cd` | 7 | The validation workflow runs on GitHub itself — the one CI claim a local reproduction cannot make and the reason a failing run must never be reported as green. |
-| `sentinel-repository-connection` | `sentinel` | 8 | The GitOps deployment path documented in docs/deployment. |
-| `detections-local-validation-run` | `detections` | 9 | The validator and the test suite run end to end on a real machine. |
+| `sentinel-repository-connection` | `sentinel` | 8 | The GitOps deployment path documented in docs/deployment.md is the real one, consuming the generated ARM templates rather than the authoring YAML. |
+| `detections-local-validation-run` | `detections` | 9 | The validator and the test suite run end to end on a real machine. Optional, and last on the list, because a green CI run supersedes it and a terminal capture is the easiest screenshot to fake. |
 
 An empty panel is honest; a drawn one is not.

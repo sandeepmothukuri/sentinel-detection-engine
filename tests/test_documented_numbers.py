@@ -223,7 +223,7 @@ def test_documents_do_not_carry_stale_counts():
     # bare phrase "30-day baseline" is not a defect on its own.
     stale = ["12 analytic rules", "12 analytics rules", "31 techniques", "11 tactics",
              "22 tests", "91 tests", "24 tests", "27 negative tests",
-             "three drift gates", "Scheduled analytics rules (12)",
+             "three drift gates", "six drift gates", "Scheduled analytics rules (12)",
              "30-day `queryPeriod`", "30d baseline", "30-day baseline self-adjusts"]
     # Word boundaries: "24 tests" must not match inside "124 tests".
     found = [s for s in stale if re.search(rf"(?<![0-9]){re.escape(s)}", text)]

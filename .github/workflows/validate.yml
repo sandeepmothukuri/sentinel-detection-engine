@@ -130,6 +130,13 @@ jobs:
       - name: Check the generated charts are current
         run: python scripts/render_project_charts.py --check
 
+      # The gallery copies its descriptions out of docs/evidence.md and its
+      # pending-shot table out of the capture manifest. Without this gate those
+      # two files drift apart silently, and the page meant to show the evidence
+      # starts describing it differently from the register.
+      - name: Check the image gallery matches the register
+        run: python scripts/generate_image_gallery.py --check
+
       - name: Package the metadata-stripped rule YAML
         run: python scripts/package_rules.py
 

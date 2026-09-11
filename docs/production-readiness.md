@@ -14,7 +14,7 @@ something is unproven, it says so instead of implying otherwise.
 | Dimension | Score | Meaning of the score |
 |---|---|---|
 | Portfolio readiness | **9 / 10** | Ready to show. Content, automation, tests, documentation and generated artefacts are all consistent and reproducible. |
-| Engineering maturity | **7 / 10** | Real validation tooling, real negative tests, six drift gates, and a deployment artifact generated from the validated rules. Held back by the absence of execution history. |
+| Engineering maturity | **7 / 10** | Real validation tooling, real negative tests, seven drift gates, and a deployment artifact generated from the validated rules. Held back by the absence of execution history. |
 | Production readiness | **5 / 10** | Deployable content with correct semantics, but nobody has run it against live telemetry. Tuning thresholds are unvalidated estimates. |
 | Operational validation | **1 / 10** | Static validation only. Zero rules have produced an alert outside CI. Deliberately scored at the floor because nothing has been observed. |
 
@@ -34,7 +34,7 @@ validation *is* the point: the repository is honest about which of the two it de
 | Validation honesty | Ready | `tests/validation/atomics.yaml` → `tests/atomics.md`, with atomic citations checked against upstream and evidence requirements for any claim above static validation |
 | Response automation design | Ready | Four playbooks, each behind a confidence threshold and allowlist parameters, with a documented rollback path |
 | Analyst-facing workbook | Ready to deploy | 13 panels, all reading `SecurityIncident`/`SecurityAlert` with real column names |
-| CI/CD | Ready | Secret scanning, lint, validation, tests, six drift gates, least-privilege permissions, SHA-pinned actions, Dependabot |
+| CI/CD | Ready | Secret scanning, lint, validation, tests, seven drift gates, least-privilege permissions, SHA-pinned actions, Dependabot |
 
 ## 3. What needs the deployer's input
 

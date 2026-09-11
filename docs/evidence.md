@@ -370,7 +370,7 @@ later starts at `04` for the same reason.*
   run.
 - **Date:** 2026-09-11
 - **Demonstrates:** The order of the checks a change must survive on the way to `main`, including
-  the six drift gates (coverage and layer, validation ledger, `deploy/`, quality matrix, workbook preview digest, generated charts)
+  the seven drift gates (coverage and layer, validation ledger, `deploy/`, quality matrix, workbook preview digest, generated charts, the image gallery)
   that fail the build when a generated artefact stops matching the files it is derived from. The
   sequence is the argument: nothing reaches the packaging step until the generated artefacts have
   been proven reproducible.
