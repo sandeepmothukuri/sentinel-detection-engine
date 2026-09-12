@@ -129,7 +129,7 @@ A successful local validation run means the repository passes its **static engin
 
 ## License
 
-MIT License.
+MIT — see [LICENSE](LICENSE).
 
 ---
 
