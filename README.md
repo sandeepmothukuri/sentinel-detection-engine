@@ -127,6 +127,12 @@ A successful local validation run means the repository passes its **static engin
 
 ---
 
+## License
+
+MIT License.
+
+---
+
 # 👤 Author
 
 ## Sandeep Mothukuri
@@ -173,7 +179,3 @@ This repository is maintained as a practical security engineering environment fo
 ---
 
 **Author portfolio:** [github.com/sandeepmothukuri](https://github.com/sandeepmothukuri)
-
-## 18. License
-
-MIT License.
