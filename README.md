@@ -127,12 +127,6 @@ A successful local validation run means the repository passes its **static engin
 
 ---
 
-## License
-
-MIT — see [LICENSE](LICENSE).
-
----
-
 # 👤 Author
 
 ## Sandeep Mothukuri
