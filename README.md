@@ -83,6 +83,50 @@ Planned work includes further ATT&CK coverage, additional detection content, dep
 
 ---
 
+# 🛠️ Local Validation CLI
+
+This repository is a **detection-as-code project**, not a standalone end-user scanner. The supported command-line entry point is the repository validator used by CI.
+
+### Install the validation toolchain
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+### Run the validator
+
+From the repository root:
+
+```bash
+python sentinel_validate.py
+```
+
+The wrapper delegates to `scripts/ci_validate.py`, so local validation uses the same validator implementation as CI. It returns a non-zero exit code when the repository fails validation.
+
+Run the full test suite:
+
+```bash
+python -m pytest tests -v
+```
+
+Run the underlying validator directly when debugging a failing check:
+
+```bash
+python scripts/ci_validate.py
+python scripts/ci_validate.py --ledger-only
+```
+
+### What validation checks
+
+The validator covers rule schema, scheduling, ATT&CK mappings, telemetry declarations, entity mappings, alert-detail placeholders, production metadata, KQL linting, validation-ledger integrity and Atomic Red Team references. The repository's CI workflow then performs the additional lint, link, generated-artifact and chart/image consistency gates. See [`scripts/ci_validate.py`](scripts/ci_validate.py) and [`.github/workflows/validate.yml`](.github/workflows/validate.yml).
+
+### Important distinction
+
+A successful local validation run means the repository passes its **static engineering checks**. It does **not** mean the KQL has been executed in a live Microsoft Sentinel tenant. The README intentionally keeps those states separate.
+
+---
+
 # 👤 Author
 
 ## Sandeep Mothukuri
